@@ -1,0 +1,11 @@
+﻿<Solution>
+  <Configurations>
+    <Platform Name="Win32" />
+    <Platform Name="x64" />
+  </Configurations>
+  <Project Path="demo\GuiTerminalDemo.vcxproj" Id="bd93cd13-dcc2-400e-894c-ac85afd8f08c">
+    <BuildDependency Project="GuiTerminal.vcxproj" />
+  </Project>
+  <Project Path="GuiTerminal.vcxproj" Id="d5688494-3fff-4319-8dce-79b15294ed14" />
+</Solution>
+

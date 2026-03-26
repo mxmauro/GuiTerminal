@@ -1,0 +1,25 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2013/05/nuspec.xsd">
+  <metadata>
+    <id>$id$</id>
+    <version>$version$</version>
+    <title>$title$</title>
+    <authors>$authors$</authors>
+    <owners>$authors$</owners>
+    <requireLicenseAcceptance>false</requireLicenseAcceptance>
+    <description>$description$</description>
+    <tags>native cplusplus cpp win32 x64 terminal direct2d directwrite</tags>
+    <repository type="git" url="$repositoryUrl$" />
+    <readme>README.md</readme>
+  </metadata>
+  <files>
+    <file src="include\*.h" target="build\native\include" />
+    <file src="lib\x86\Debug\GuiTerminal.lib" target="build\native\lib\Win32\Debug" />
+    <file src="lib\x86\Release\GuiTerminal.lib" target="build\native\lib\Win32\Release" />
+    <file src="lib\x64\Debug\GuiTerminal.lib" target="build\native\lib\x64\Debug" />
+    <file src="lib\x64\Release\GuiTerminal.lib" target="build\native\lib\x64\Release" />
+    <file src="nuget\build\native\GuiTerminal.props" target="build\native\GuiTerminal.props" />
+    <file src="README.md" target="README.md" />
+  </files>
+</package>
+

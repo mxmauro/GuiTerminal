@@ -1,0 +1,61 @@
+name: Publish NuGet Package
+
+on:
+  release:
+    types:
+      - published
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  publish:
+    runs-on: windows-2025-vs2026
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v2
+        with:
+          vs-version: "[18.0,19.0)"
+
+      - name: Resolve package version from release tag
+        id: version
+        shell: pwsh
+        run: |
+          $tag = '${{ github.event.release.tag_name }}'
+          if ($tag -notmatch '^v(\d+)\.(\d+)\.(\d+)$') {
+              throw "Release tag '$tag' is invalid. Expected format: v#.#.#"
+          }
+
+          $version = $tag.Substring(1)
+          "package_version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+
+      - name: Build and pack GuiTerminal
+        shell: pwsh
+        run: |
+          .\nuget\pack.ps1 -Version '${{ steps.version.outputs.package_version }}'
+
+      - name: Upload package as workflow artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: GuiTerminal.${{ steps.version.outputs.package_version }}
+          path: nuget/artifacts/GuiTerminal.${{ steps.version.outputs.package_version }}.nupkg
+
+      - name: Publish package to GitHub Packages
+        shell: pwsh
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          dotnet nuget push "nuget/artifacts/GuiTerminal.${{ steps.version.outputs.package_version }}.nupkg" `
+            --source "https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json" `
+            --api-key $env:GITHUB_TOKEN `
+            --skip-duplicate

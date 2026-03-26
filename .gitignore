@@ -1,0 +1,16 @@
+*.~*
+*.suo
+*.ncb
+*.exp
+*.user
+*.sdf
+*.log
+*.obj
+*.ilk
+/.vs/
+/bin/
+/lib/
+/obj/
+/nuget/artifacts/
+*.nupkg
+*.snupkg
