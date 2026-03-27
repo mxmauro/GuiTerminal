@@ -9,6 +9,9 @@
       <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
       <Extensions>h;hh;hpp;hxx;h++;hm;inl;inc;ipp;xsd</Extensions>
     </Filter>
+    <Filter Include="NuGet">
+      <UniqueIdentifier>{f7ab2d05-ed26-4754-8669-1eee41cd0aad}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\GuiTerminalBuffer.cpp">
@@ -37,5 +40,18 @@
     <ClInclude Include="include\GuiTerminalRenderer.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="LICENSE" />
+    <None Include="README.md" />
+    <None Include="GuiTerminal.nuspec">
+      <Filter>NuGet</Filter>
+    </None>
+    <None Include="nuget\pack.ps1">
+      <Filter>NuGet</Filter>
+    </None>
+    <None Include="nuget\build\native\GuiTerminal.props">
+      <Filter>NuGet</Filter>
+    </None>
   </ItemGroup>
 </Project>

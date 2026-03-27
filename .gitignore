@@ -3,6 +3,7 @@
 *.ncb
 *.exp
 *.user
+*.aps
 *.sdf
 *.log
 *.obj

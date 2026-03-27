@@ -69,7 +69,7 @@ namespace GuiTerminal::Internals
 
     VOID Parser::HandleCsi(_In_ WCHAR chCodepointW) noexcept
     {
-        if ((chCodepointW >= L'0') && (chCodepointW <= L'9'))
+        if (chCodepointW >= L'0' && chCodepointW <= L'9')
         {
             m_bHasCurrentNumber = TRUE;
             m_iCurrentNumber = (m_iCurrentNumber * 10) + static_cast<INT>(chCodepointW - L'0');
@@ -80,7 +80,7 @@ namespace GuiTerminal::Internals
             PushCurrentNumber();
             return;
         }
-        if ((chCodepointW >= 0x40U) && (chCodepointW <= 0x7EU))
+        if (chCodepointW >= 0x40 && chCodepointW <= 0x7E)
         {
             PushCurrentNumber();
             DispatchCsi(chCodepointW);
@@ -181,4 +181,3 @@ static BOOL IsC0Control(_In_ WCHAR chCodepointW) noexcept
 {
     return ((chCodepointW < 0x20U) || (chCodepointW == 0x7FU)) ? TRUE : FALSE;
 }
-

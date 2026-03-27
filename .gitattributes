@@ -18,6 +18,7 @@
 *.gz binary
 *.zip binary
 *.7z binary
+*.webp binary
 *.ttf binary
 *.eot binary
 *.woff binary

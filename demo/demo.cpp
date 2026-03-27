@@ -1,14 +1,16 @@
 ﻿#include <SDKDDKVer.h>
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
+#include <stdio.h>
 #include "resource.h"
 #include "..\include\GuiTerminalControl.h"
-#include <stdio.h>
 
-#define TERMINAL_COLS 80
-#define TERMINAL_ROWS 25
-#define WINDOW_CLASS_NAME L"SampleGuiTerminalWindow"
-#define WINDOW_TITLE      L"Sample GuiTerminal"
+#define TERMINAL_COLS        80
+#define TERMINAL_ROWS        25
+#define TERMINAL_FONT_FAMILY L"Consolas"
+#define TERMINAL_FONT_SIZE   18.0f
+#define WINDOW_CLASS_NAME    L"SampleGuiTerminalWindow"
+#define WINDOW_TITLE         L"Sample GuiTerminal"
 
 // -----------------------------------------------------------------------------
 
@@ -81,7 +83,7 @@ static HRESULT EnablePerMonitorDpiAwareness() noexcept
 static HRESULT CreateMainWindow(_In_ HINSTANCE hInstance, _In_ INT nCmdShow, _In_z_ LPCWSTR szWindowClassW,
                                 _In_z_ LPCWSTR szTitleW, _Out_ HWND* lphWnd) noexcept
 {
-    WNDCLASSEXW wcxW;
+    WNDCLASSEXW sWcExW;
     HWND hWnd;
 
     if (lphWnd == nullptr)
@@ -89,20 +91,20 @@ static HRESULT CreateMainWindow(_In_ HINSTANCE hInstance, _In_ INT nCmdShow, _In
         return E_POINTER;
     }
 
-    memset(&wcxW, 0, sizeof(wcxW));
-    wcxW.cbSize = sizeof(wcxW);
-    wcxW.style = CS_HREDRAW | CS_VREDRAW;
-    wcxW.lpfnWndProc = MainWndProc;
-    wcxW.cbClsExtra = 0;
-    wcxW.cbWndExtra = 0;
-    wcxW.hInstance = hInstance;
-    wcxW.hIcon = LoadIconW(hInstance, MAKEINTRESOURCEW(IDI_WINDOWSPROJECT1));
-    wcxW.hCursor = LoadCursorW(nullptr, IDC_ARROW);
-    wcxW.hbrBackground = nullptr;
-    wcxW.lpszMenuName = nullptr;
-    wcxW.lpszClassName = szWindowClassW;
-    wcxW.hIconSm = LoadIconW(hInstance, MAKEINTRESOURCEW(IDI_SMALL));
-    if (RegisterClassExW(&wcxW) == FALSE)
+    memset(&sWcExW, 0, sizeof(sWcExW));
+    sWcExW.cbSize = sizeof(sWcExW);
+    sWcExW.style = CS_HREDRAW | CS_VREDRAW;
+    sWcExW.lpfnWndProc = MainWndProc;
+    sWcExW.cbClsExtra = 0;
+    sWcExW.cbWndExtra = 0;
+    sWcExW.hInstance = hInstance;
+    sWcExW.hIcon = LoadIconW(hInstance, MAKEINTRESOURCEW(IDI_WINDOWSPROJECT1));
+    sWcExW.hCursor = LoadCursorW(nullptr, IDC_ARROW);
+    sWcExW.hbrBackground = nullptr;
+    sWcExW.lpszMenuName = nullptr;
+    sWcExW.lpszClassName = szWindowClassW;
+    sWcExW.hIconSm = LoadIconW(hInstance, MAKEINTRESOURCEW(IDI_SMALL));
+    if (RegisterClassExW(&sWcExW) == FALSE)
     {
         return HRESULT_FROM_WIN32(GetLastError());
     }
@@ -116,11 +118,12 @@ static HRESULT CreateMainWindow(_In_ HINSTANCE hInstance, _In_ INT nCmdShow, _In
 
     ShowWindow(hWnd, nCmdShow);
     UpdateWindow(hWnd);
+
     *lphWnd = hWnd;
     return S_OK;
 }
 
-LRESULT CALLBACK MainWndProc(HWND hWnd, UINT uMessage, WPARAM wParam, LPARAM lParam) noexcept
+static LRESULT CALLBACK MainWndProc(_In_ HWND hWnd, _In_ UINT uMessage, _In_ WPARAM wParam, _In_ LPARAM lParam) noexcept
 {
     LRESULT lResult;
 
@@ -143,10 +146,16 @@ LRESULT CALLBACK MainWndProc(HWND hWnd, UINT uMessage, WPARAM wParam, LPARAM lPa
 static LRESULT HandleCreate(_In_ HWND hWnd) noexcept
 {
     GuiTerminal::Control* lpGuiTerminal;
+    GuiTerminal::Control::Config configTerminal;
     HRESULT hr;
 
     lpGuiTerminal = nullptr;
-    hr = GuiTerminal::Control::Create(hWnd, TERMINAL_ROWS, TERMINAL_COLS, &lpGuiTerminal);
+    configTerminal = GuiTerminal::Control::Config{};
+    configTerminal.iRows = TERMINAL_ROWS;
+    configTerminal.iCols = TERMINAL_COLS;
+    configTerminal.szFontFamilyW = TERMINAL_FONT_FAMILY;
+    configTerminal.fFontSize = TERMINAL_FONT_SIZE;
+    hr = GuiTerminal::Control::Create(hWnd, configTerminal, &lpGuiTerminal);
     if (FAILED(hr))
     {
         return -1;
@@ -200,18 +209,18 @@ static HRESULT RunDemo(_In_ GuiTerminal::Control* lpGuiTerminal) noexcept
     lpGuiTerminal->Clear();
 
     lpGuiTerminal->Write(L"\x1b[1;97mWin32 + Direct2D/DirectWrite terminal demo\x1b[0m\r\n"
-                      L"\x1b[38;2;255;170;40mTruecolor foreground\x1b[0m  "
-                      L"\x1b[48;2;0;96;160;97mtruecolor background\x1b[0m  "
-                      L"\x1b[4munderline\x1b[24m  "
-                      L"\x1b[1mbold\x1b[22m  "
-                      L"\x1b[5mblink\x1b[25m\r\n"
-                      L"\x1b[32mGreen\x1b[0m "
-                      L"\x1b[33mYellow\x1b[0m "
-                      L"\x1b[34mBlue\x1b[0m "
-                      L"\x1b[91mBright red\x1b[0m "
-                      L"\x1b[38;5;141m256-color\x1b[0m\r\n"
-                      L"\x1b[s\x1b[6;5HPositioned at row 6 col 5\x1b[u"
-                      L"\x1b[8;1H\x1b[2KTwo independent scrolling regions below:");
+                         L"\x1b[38;2;255;170;40mTruecolor foreground\x1b[0m  "
+                         L"\x1b[48;2;0;96;160;97mtruecolor background\x1b[0m  "
+                         L"\x1b[4munderline\x1b[24m  "
+                         L"\x1b[1mbold\x1b[22m  "
+                         L"\x1b[5mblink\x1b[25m\r\n"
+                         L"\x1b[32mGreen\x1b[0m "
+                         L"\x1b[33mYellow\x1b[0m "
+                         L"\x1b[34mBlue\x1b[0m "
+                         L"\x1b[91mBright red\x1b[0m "
+                         L"\x1b[38;5;141m256-color\x1b[0m\r\n"
+                         L"\x1b[s\x1b[6;5HPositioned at row 6 col 5\x1b[u"
+                         L"\x1b[8;1H\x1b[2KTwo independent scrolling regions below:");
 
     hr = lpGuiTerminal->CreateRegion(0, 10, 39, 15, &hRegionLeft);
     if (FAILED(hr))
@@ -227,7 +236,7 @@ static HRESULT RunDemo(_In_ GuiTerminal::Control* lpGuiTerminal) noexcept
     lpGuiTerminal->WriteRegion(hRegionLeft, L"\x1b[44;97m Left region \x1b[0m\r\n");
     lpGuiTerminal->WriteRegion(hRegionRight, L"\x1b[42;30m Right region \x1b[0m\r\n");
 
-    for (iIndex = 1; iIndex <= 20; ++iIndex)
+    for (iIndex = 1; iIndex <= 20; iIndex++)
     {
         swprintf_s(szBufferW, sizeof(szBufferW) / sizeof(szBufferW[0]), L"\x1b[38;5;81mleft\x1b[0m line %d\r\n", iIndex);
         lpGuiTerminal->WriteRegion(hRegionLeft, szBufferW);
@@ -238,4 +247,3 @@ static HRESULT RunDemo(_In_ GuiTerminal::Control* lpGuiTerminal) noexcept
 
     return S_OK;
 }
-

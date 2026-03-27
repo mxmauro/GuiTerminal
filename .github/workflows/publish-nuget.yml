@@ -1,13 +1,13 @@
 name: Publish NuGet Package
 
 on:
-  release:
-    types:
-      - published
+  push:
+    tags:
+      - 'v*'
 
 permissions:
   contents: read
-  packages: write
+  id-token: write
 
 jobs:
   publish:
@@ -31,11 +31,10 @@ jobs:
         id: version
         shell: pwsh
         run: |
-          $tag = '${{ github.event.release.tag_name }}'
-          if ($tag -notmatch '^v(\d+)\.(\d+)\.(\d+)$') {
-              throw "Release tag '$tag' is invalid. Expected format: v#.#.#"
+          $tag = $env:GITHUB_REF_NAME
+          if ($tag -notmatch '^v\d+\.\d+\.\d+(-[0-9A-Za-z][0-9A-Za-z.-]*)?$') {
+            throw "Invalid tag format: $tag. Expected v#.#.# or v#.#.#-suffix"
           }
-
           $version = $tag.Substring(1)
           "package_version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
 
@@ -50,12 +49,16 @@ jobs:
           name: GuiTerminal.${{ steps.version.outputs.package_version }}
           path: nuget/artifacts/GuiTerminal.${{ steps.version.outputs.package_version }}.nupkg
 
-      - name: Publish package to GitHub Packages
+      - name: Login to NuGet.org
+        uses: NuGet/login@v1
+        id: login
+        with:
+          user: ${{ secrets.NUGET_USER }}
+    
+      - name: Publish package to NuGet.org
         shell: pwsh
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           dotnet nuget push "nuget/artifacts/GuiTerminal.${{ steps.version.outputs.package_version }}.nupkg" `
-            --source "https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json" `
-            --api-key $env:GITHUB_TOKEN `
+            --source https://api.nuget.org/v3/index.json `
+            --api-key ${{ steps.login.outputs.NUGET_API_KEY }} `
             --skip-duplicate

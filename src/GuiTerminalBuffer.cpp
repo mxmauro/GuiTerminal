@@ -6,7 +6,8 @@
 // -----------------------------------------------------------------------------
 
 static COLORREF MakeColor(_In_ BYTE byRed, _In_ BYTE byGreen, _In_ BYTE byBlue) noexcept;
-static GuiTerminal::Internals::Attributes MakeAttributes(_In_ COLORREF crForeground, _In_ COLORREF crBackground, _In_ DWORD dwStyleFlags) noexcept;
+static GuiTerminal::Internals::Attributes MakeAttributes(_In_ COLORREF crForeground, _In_ COLORREF crBackground,
+                                                         _In_ DWORD dwStyleFlags) noexcept;
 static BOOL IsWithinBounds(_In_ INT iValue, _In_ INT iMinimum, _In_ INT iMaximumExclusive) noexcept;
 static INT ClampInt(_In_ INT iValue, _In_ INT iMinimum, _In_ INT iMaximumValue) noexcept;
 static COLORREF GetAnsi16Color(_In_ INT iIndex) noexcept;
@@ -16,11 +17,19 @@ static COLORREF GetXterm256Color(_In_ INT iIndex) noexcept;
 
 namespace GuiTerminal::Internals
 {
-    HRESULT Buffer::Initialize(_In_ INT iCols, _In_ INT iRows) noexcept
+    HRESULT Buffer::Initialize(_In_ INT iCols, _In_ INT iRows, _In_ COLORREF crDefaultForeground,
+                               _In_ COLORREF crDefaultBackground) noexcept
     {
         Region_s sDefaultRegion;
         HRESULT hr;
 
+        m_sAttributesDefault = MakeAttributes(MakeColor(GetRValue(crDefaultForeground),
+                                                        GetGValue(crDefaultForeground),
+                                                        GetBValue(crDefaultForeground)),
+                                              MakeColor(GetRValue(crDefaultBackground),
+                                                        GetGValue(crDefaultBackground),
+                                                        GetBValue(crDefaultBackground)),
+                                              Control::StyleNone);
         m_iCols = iCols;
         m_iRows = iRows;
         hr = InitializeCells();
@@ -33,6 +42,7 @@ namespace GuiTerminal::Internals
         sDefaultRegion = {};
         sDefaultRegion.iWidth = iCols;
         sDefaultRegion.iHeight = iRows;
+        sDefaultRegion.sAttributesCurrent = m_sAttributesDefault;
         try
         {
             m_mapRegions.clear();
@@ -51,76 +61,65 @@ namespace GuiTerminal::Internals
 
     HRESULT Buffer::Resize(_In_ INT iCols, _In_ INT iRows) noexcept
     {
-        std::vector<Cell> vecOldCells;
-        std::unordered_map<INT, Region_s> mapOldRegions;
+        std::vector<Cell> vecNewCells;
+        std::unordered_map<INT, Region_s> mapNewRegions;
         Region_s sDefaultRegion;
-        INT iOldCols;
+        Cell cellBlank;
         INT iCopyCols;
         INT iCopyRows;
         INT iRow;
         INT iCol;
-        HRESULT hr;
+        size_t uCellsCount;
 
-        try
+        if ((iCols <= 0) || (iRows <= 0))
         {
-            vecOldCells = m_vecCells;
-            mapOldRegions = m_mapRegions;
-        }
-        catch (const std::bad_alloc&)
-        {
-            return E_OUTOFMEMORY;
-        }
-        catch (...)
-        {
-            return E_UNEXPECTED;
+            return E_INVALIDARG;
         }
 
-        iOldCols = m_iCols;
         iCopyCols = (std::min)(m_iCols, iCols);
         iCopyRows = (std::min)(m_iRows, iRows);
-
-        m_iCols = iCols;
-        m_iRows = iRows;
-        hr = InitializeCells();
-        if (FAILED(hr))
-        {
-            return hr;
-        }
 
         sDefaultRegion = {};
         sDefaultRegion.iWidth = iCols;
         sDefaultRegion.iHeight = iRows;
+        sDefaultRegion.sAttributesCurrent = m_sAttributesDefault;
+        cellBlank = Cell{};
+        cellBlank.chCodepointW = L' ';
+        cellBlank.crForeground = m_sAttributesDefault.crForeground;
+        cellBlank.crBackground = m_sAttributesDefault.crBackground;
+        cellBlank.dwStyleFlags = Control::StyleNone;
+        cellBlank.bIsDirty = TRUE;
+        uCellsCount = static_cast<size_t>(iCols) * static_cast<size_t>(iRows);
         try
         {
+            vecNewCells.assign(uCellsCount, cellBlank);
             for (iRow = 0; iRow < iCopyRows; ++iRow)
             {
                 for (iCol = 0; iCol < iCopyCols; ++iCol)
                 {
-                    m_vecCells[static_cast<size_t>(iRow * iCols + iCol)] = vecOldCells[static_cast<size_t>(iRow * iOldCols + iCol)];
+                    vecNewCells[static_cast<size_t>(iRow * iCols + iCol)] = m_vecCells[static_cast<size_t>(iRow * m_iCols + iCol)];
                 }
             }
 
-            m_mapRegions.clear();
-            m_mapRegions.emplace(0, sDefaultRegion);
+            mapNewRegions.emplace(0, sDefaultRegion);
 
-            for (const auto& pairRegion : mapOldRegions)
+            for (const auto& pairRegion : m_mapRegions)
             {
                 Region_s sCurrentRegion;
 
-                if (pairRegion.first == 0)
+                if (pairRegion.first != 0)
                 {
-                    continue;
+                    sCurrentRegion = pairRegion.second;
+                    sCurrentRegion.iX = ClampInt(sCurrentRegion.iX, 0, iCols - 1);
+                    sCurrentRegion.iY = ClampInt(sCurrentRegion.iY, 0, iRows - 1);
+                    sCurrentRegion.iWidth = ClampInt(sCurrentRegion.iWidth, 1, iCols - sCurrentRegion.iX);
+                    sCurrentRegion.iHeight = ClampInt(sCurrentRegion.iHeight, 1, iRows - sCurrentRegion.iY);
+                    sCurrentRegion.iCursorX = ClampInt(sCurrentRegion.iCursorX, 0, sCurrentRegion.iWidth - 1);
+                    sCurrentRegion.iCursorY = ClampInt(sCurrentRegion.iCursorY, 0, sCurrentRegion.iHeight - 1);
+                    sCurrentRegion.sCursorSaved.iX = ClampInt(sCurrentRegion.sCursorSaved.iX, 0, sCurrentRegion.iWidth - 1);
+                    sCurrentRegion.sCursorSaved.iY = ClampInt(sCurrentRegion.sCursorSaved.iY, 0, sCurrentRegion.iHeight - 1);
+                    mapNewRegions.emplace(sCurrentRegion.iId, sCurrentRegion);
                 }
-                sCurrentRegion = pairRegion.second;
-                sCurrentRegion.iX = ClampInt(sCurrentRegion.iX, 0, iCols - 1);
-                sCurrentRegion.iY = ClampInt(sCurrentRegion.iY, 0, iRows - 1);
-                sCurrentRegion.iWidth = ClampInt(sCurrentRegion.iWidth, 1, iCols - sCurrentRegion.iX);
-                sCurrentRegion.iHeight = ClampInt(sCurrentRegion.iHeight, 1, iRows - sCurrentRegion.iY);
-                sCurrentRegion.iCursorX = ClampInt(sCurrentRegion.iCursorX, 0, sCurrentRegion.iWidth - 1);
-                sCurrentRegion.iCursorY = ClampInt(sCurrentRegion.iCursorY, 0, sCurrentRegion.iHeight - 1);
-                sCurrentRegion.sCursorSaved.iX = ClampInt(sCurrentRegion.sCursorSaved.iX, 0, sCurrentRegion.iWidth - 1);
-                sCurrentRegion.sCursorSaved.iY = ClampInt(sCurrentRegion.sCursorSaved.iY, 0, sCurrentRegion.iHeight - 1);
-                m_mapRegions.emplace(sCurrentRegion.iId, sCurrentRegion);
             }
         }
         catch (const std::bad_alloc&)
@@ -131,6 +130,11 @@ namespace GuiTerminal::Internals
         {
             return E_UNEXPECTED;
         }
+
+        m_iCols = iCols;
+        m_iRows = iRows;
+        m_vecCells = std::move(vecNewCells);
+        m_mapRegions = std::move(mapNewRegions);
         return S_OK;
     }
 
@@ -157,7 +161,8 @@ namespace GuiTerminal::Internals
     }
 
     VOID Buffer::FillArea(_In_opt_ RegionHandle hRegion, _In_ INT iX, _In_ INT iY, _In_ INT iWidth, _In_ INT iHeight,
-                          _In_ WCHAR chCodepointW, _In_ COLORREF crForeground, _In_ COLORREF crBackground, _In_ DWORD dwStyleFlags) noexcept
+                          _In_ WCHAR chCodepointW, _In_ COLORREF crForeground, _In_ COLORREF crBackground,
+                          _In_ DWORD dwStyleFlags) noexcept
     {
         INT iStartX;
         INT iStartY;
@@ -520,6 +525,7 @@ namespace GuiTerminal::Internals
         regionCurrent.iY = iY;
         regionCurrent.iWidth = iWidth;
         regionCurrent.iHeight = iHeight;
+        regionCurrent.sAttributesCurrent = m_sAttributesDefault;
         try
         {
             m_mapRegions.emplace(regionCurrent.iId, regionCurrent);
@@ -683,7 +689,8 @@ namespace GuiTerminal::Internals
         SetCell(iX, iY, L' ', attributesCell);
     }
 
-    VOID Buffer::FillRange(_In_ INT iXStart, _In_ INT iYStart, _In_ INT iXEnd, _In_ INT iYEnd, _In_ const Attributes& attributesCell) noexcept
+    VOID Buffer::FillRange(_In_ INT iXStart, _In_ INT iYStart, _In_ INT iXEnd, _In_ INT iYEnd,
+                           _In_ const Attributes& attributesCell) noexcept
     {
         for (INT iY = iYStart; iY <= iYEnd; ++iY)
         {
@@ -878,7 +885,8 @@ static COLORREF MakeColor(_In_ BYTE byRed, _In_ BYTE byGreen, _In_ BYTE byBlue) 
     return RGB(byRed, byGreen, byBlue);
 }
 
-static GuiTerminal::Internals::Attributes MakeAttributes(_In_ COLORREF crForeground, _In_ COLORREF crBackground, _In_ DWORD dwStyleFlags) noexcept
+static GuiTerminal::Internals::Attributes MakeAttributes(_In_ COLORREF crForeground, _In_ COLORREF crBackground,
+                                                         _In_ DWORD dwStyleFlags) noexcept
 {
     GuiTerminal::Internals::Attributes attributesCell;
 
@@ -954,4 +962,3 @@ static COLORREF GetXterm256Color(_In_ INT iIndex) noexcept
     iGray = 8 + ((iColorIndex - 232) * 10);
     return MakeColor(static_cast<BYTE>(iGray), static_cast<BYTE>(iGray), static_cast<BYTE>(iGray));
 }
-

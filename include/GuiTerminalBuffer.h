@@ -11,18 +11,6 @@ namespace GuiTerminal
 {
     namespace Internals
     {
-    /*
-        enum StyleFlags : DWORD
-        {
-            StyleNone = 0U,
-            StyleBold = 1U << 0,
-            StyleUnderline = 1U << 1,
-            StyleBlink = 1U << 2,
-            StyleInverse = 1U << 3,
-            StyleItalic = 1U << 4
-        };
-        */
-
         struct CursorState
         {
             INT iX{};
@@ -47,7 +35,7 @@ namespace GuiTerminal
             INT iCursorY{};
             CursorState sCursorSaved;
             BOOL bWrapPending{ FALSE };
-            Attributes sAttributesCurrent{ RGB(204U, 204U, 204U), RGB(12U, 12U, 12U), 0 };
+            Attributes sAttributesCurrent{};
         };
     }
 
@@ -86,13 +74,15 @@ namespace GuiTerminal
             Buffer& operator=(const Buffer&) = delete;
             Buffer& operator=(Buffer&&) = delete;
 
-            HRESULT Initialize(_In_ INT iCols, _In_ INT iRows) noexcept;
+            HRESULT Initialize(_In_ INT iCols, _In_ INT iRows, _In_ COLORREF crDefaultForeground,
+                               _In_ COLORREF crDefaultBackground) noexcept;
             HRESULT Resize(_In_ INT iCols, _In_ INT iRows) noexcept;
 
             VOID ClearRegion(_In_opt_ RegionHandle hRegion) noexcept;
 
             VOID FillArea(_In_opt_ RegionHandle hRegion, _In_ INT iX, _In_ INT iY, _In_ INT iWidth, _In_ INT iHeight,
-                          _In_ WCHAR chCodepointW, _In_ COLORREF crForeground, _In_ COLORREF crBackground, _In_ DWORD dwStyleFlags) noexcept;
+                          _In_ WCHAR chCodepointW, _In_ COLORREF crForeground, _In_ COLORREF crBackground,
+                          _In_ DWORD dwStyleFlags) noexcept;
 
             VOID ScrollRegion(_In_opt_ RegionHandle hRegion, _In_ INT iLineCount) noexcept;
 
@@ -129,7 +119,8 @@ namespace GuiTerminal
 
             VOID SetCell(_In_ INT iX, _In_ INT iY, _In_ WCHAR chCodepointW, _In_ const Attributes& sAttributesCell) noexcept;
             VOID FillCell(_In_ INT iX, _In_ INT iY, _In_ const Attributes& sAttributesCell) noexcept;
-            VOID FillRange(_In_ INT iXStart, _In_ INT iYStart, _In_ INT iXEnd, _In_ INT iYEnd, _In_ const Attributes& sAttributesCell) noexcept;
+            VOID FillRange(_In_ INT iXStart, _In_ INT iYStart, _In_ INT iXEnd, _In_ INT iYEnd,
+                           _In_ const Attributes& sAttributesCell) noexcept;
 
             VOID ScrollRegionUp(_In_opt_ RegionHandle hRegion, _In_ INT iLineCount) noexcept;
             VOID ScrollRegionDown(_In_opt_ RegionHandle hRegion, _In_ INT iLineCount) noexcept;
@@ -146,11 +137,10 @@ namespace GuiTerminal
             INT m_iCols{};
             INT m_iRows{};
             std::vector<Cell> m_vecCells;
-            Attributes m_sAttributesDefault{ RGB(204U, 204U, 204U), RGB(12U, 12U, 12U), 0 };
+            Attributes m_sAttributesDefault{};
             std::unordered_map<INT, Region_s> m_mapRegions;
             INT m_iNextRegionId{ 1 };
             BOOL m_bBlinkVisible{ TRUE };
         };
     }
 }
-

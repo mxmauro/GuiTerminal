@@ -4,7 +4,7 @@ GuiTerminal is a native C++ terminal control for Win32 desktop applications. It 
 
 The library is intended for applications that need terminal behavior without hosting an external console window. Typical use cases include embedded shells, device consoles, developer tools, log viewers, retro-style interfaces, and applications that want ANSI-style formatted text inside a standard Win32 GUI.
 
-![Demo screenshot](screenshot.png "Demo screenshot")
+![Demo screenshot](screenshot.webp "Demo screenshot")
 
 ## What the library does
 

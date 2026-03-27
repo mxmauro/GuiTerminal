@@ -30,6 +30,13 @@
     <ClInclude Include="include\GuiTerminalParser.h" />
     <ClInclude Include="include\GuiTerminalRenderer.h" />
   </ItemGroup>
+  <ItemGroup>
+    <None Include="GuiTerminal.nuspec" />
+    <None Include="LICENSE" />
+    <None Include="nuget\build\native\GuiTerminal.props" />
+    <None Include="nuget\pack.ps1" />
+    <None Include="README.md" />
+  </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>18.0</VCProjectVersion>
     <Keyword>Win32Proj</Keyword>
