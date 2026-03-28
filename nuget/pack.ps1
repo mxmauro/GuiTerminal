@@ -96,12 +96,20 @@ New-Item -ItemType Directory -Force -Path (Join-Path $packageRoot "build\native\
 New-Item -ItemType Directory -Force -Path (Join-Path $packageRoot "build\native\lib\x64\Release") | Out-Null
 
 Copy-Item (Join-Path $repoRoot "include\*.h") (Join-Path $packageRoot "build\native\include") -Force
+
 Copy-Item (Join-Path $repoRoot "lib\x86\Debug\GuiTerminal.lib") (Join-Path $packageRoot "build\native\lib\Win32\Debug\GuiTerminal.lib") -Force
+Copy-Item (Join-Path $repoRoot "lib\x86\Debug\GuiTerminal.pdb") (Join-Path $packageRoot "build\native\lib\Win32\Debug\GuiTerminal.pdb") -Force
 Copy-Item (Join-Path $repoRoot "lib\x86\Release\GuiTerminal.lib") (Join-Path $packageRoot "build\native\lib\Win32\Release\GuiTerminal.lib") -Force
+Copy-Item (Join-Path $repoRoot "lib\x86\Release\GuiTerminal.pdb") (Join-Path $packageRoot "build\native\lib\Win32\Release\GuiTerminal.pdb") -Force
 Copy-Item (Join-Path $repoRoot "lib\x64\Debug\GuiTerminal.lib") (Join-Path $packageRoot "build\native\lib\x64\Debug\GuiTerminal.lib") -Force
+Copy-Item (Join-Path $repoRoot "lib\x64\Debug\GuiTerminal.pdb") (Join-Path $packageRoot "build\native\lib\x64\Debug\GuiTerminal.pdb") -Force
 Copy-Item (Join-Path $repoRoot "lib\x64\Release\GuiTerminal.lib") (Join-Path $packageRoot "build\native\lib\x64\Release\GuiTerminal.lib") -Force
+Copy-Item (Join-Path $repoRoot "lib\x64\Release\GuiTerminal.pdb") (Join-Path $packageRoot "build\native\lib\x64\Release\GuiTerminal.pdb") -Force
+
 Copy-Item (Join-Path $repoRoot "nuget\build\native\GuiTerminal.props") (Join-Path $packageRoot "build\native\GuiTerminal.props") -Force
+
 Copy-Item (Join-Path $repoRoot "README.md") (Join-Path $packageRoot "README.md") -Force
+Copy-Item (Join-Path $repoRoot "LICENSE") (Join-Path $packageRoot "LICENSE") -Force
 
 Set-Content -Path (Join-Path $packageRoot "$PackageId.nuspec") -Value $resolvedNuspec -Encoding UTF8
 
