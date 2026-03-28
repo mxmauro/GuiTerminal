@@ -2,6 +2,10 @@
   <Configurations>
     <Platform Name="Win32" />
     <Platform Name="x64" />
+    <BuildType Name="DebugMD" />
+    <BuildType Name="DebugMT" />
+    <BuildType Name="ReleaseMD" />
+    <BuildType Name="ReleaseMT" />
   </Configurations>
   <Project Path="demo\GuiTerminalDemo.vcxproj" Id="bd93cd13-dcc2-400e-894c-ac85afd8f08c">
     <BuildDependency Project="GuiTerminal.vcxproj" />

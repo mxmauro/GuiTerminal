@@ -68,14 +68,18 @@ if (Test-Path $packageRoot) {
 New-Item -ItemType Directory -Force -Path $packageRoot | Out-Null
 
 $buildMatrix = @(
-    @{ Configuration = "Debug"; Platform = "Win32" },
-    @{ Configuration = "Release"; Platform = "Win32" },
-    @{ Configuration = "Debug"; Platform = "x64" },
-    @{ Configuration = "Release"; Platform = "x64" }
+    @{ Configuration = "DebugMT"; Platform = "Win32"; PackageConfiguration = "Debug"; RuntimeSubdir = "MT"; PlatformTarget = "x86" },
+    @{ Configuration = "DebugMD"; Platform = "Win32"; PackageConfiguration = "Debug"; RuntimeSubdir = "MD"; PlatformTarget = "x86" },
+    @{ Configuration = "ReleaseMT"; Platform = "Win32"; PackageConfiguration = "Release"; RuntimeSubdir = "MT"; PlatformTarget = "x86" },
+    @{ Configuration = "ReleaseMD"; Platform = "Win32"; PackageConfiguration = "Release"; RuntimeSubdir = "MD"; PlatformTarget = "x86" },
+    @{ Configuration = "DebugMT"; Platform = "x64"; PackageConfiguration = "Debug"; RuntimeSubdir = "MT"; PlatformTarget = "x64" },
+    @{ Configuration = "DebugMD"; Platform = "x64"; PackageConfiguration = "Debug"; RuntimeSubdir = "MD"; PlatformTarget = "x64" },
+    @{ Configuration = "ReleaseMT"; Platform = "x64"; PackageConfiguration = "Release"; RuntimeSubdir = "MT"; PlatformTarget = "x64" },
+    @{ Configuration = "ReleaseMD"; Platform = "x64"; PackageConfiguration = "Release"; RuntimeSubdir = "MD"; PlatformTarget = "x64" }
 )
 
 foreach ($build in $buildMatrix) {
-    & $msbuild (Join-Path $repoRoot "GuiTerminal.vcxproj") /t:Build /p:Configuration=$($build.Configuration) /p:Platform=$($build.Platform)
+    & $msbuild (Join-Path $repoRoot "GuiTerminal.vcxproj") /t:Rebuild /p:Configuration=$($build.Configuration) /p:Platform=$($build.Platform)
     if ($LASTEXITCODE -ne 0) {
         throw "$($build.Platform) $($build.Configuration) build failed."
     }
@@ -90,21 +94,19 @@ $resolvedNuspec = (Get-Content (Join-Path $repoRoot "GuiTerminal.nuspec") -Raw).
     Replace('$repositoryUrl$', $RepositoryUrl)
 
 New-Item -ItemType Directory -Force -Path (Join-Path $packageRoot "build\native\include") | Out-Null
-New-Item -ItemType Directory -Force -Path (Join-Path $packageRoot "build\native\lib\Win32\Debug") | Out-Null
-New-Item -ItemType Directory -Force -Path (Join-Path $packageRoot "build\native\lib\Win32\Release") | Out-Null
-New-Item -ItemType Directory -Force -Path (Join-Path $packageRoot "build\native\lib\x64\Debug") | Out-Null
-New-Item -ItemType Directory -Force -Path (Join-Path $packageRoot "build\native\lib\x64\Release") | Out-Null
 
 Copy-Item (Join-Path $repoRoot "include\*.h") (Join-Path $packageRoot "build\native\include") -Force
 
-Copy-Item (Join-Path $repoRoot "lib\x86\Debug\GuiTerminal.lib") (Join-Path $packageRoot "build\native\lib\Win32\Debug\GuiTerminal.lib") -Force
-Copy-Item (Join-Path $repoRoot "lib\x86\Debug\GuiTerminal.pdb") (Join-Path $packageRoot "build\native\lib\Win32\Debug\GuiTerminal.pdb") -Force
-Copy-Item (Join-Path $repoRoot "lib\x86\Release\GuiTerminal.lib") (Join-Path $packageRoot "build\native\lib\Win32\Release\GuiTerminal.lib") -Force
-Copy-Item (Join-Path $repoRoot "lib\x86\Release\GuiTerminal.pdb") (Join-Path $packageRoot "build\native\lib\Win32\Release\GuiTerminal.pdb") -Force
-Copy-Item (Join-Path $repoRoot "lib\x64\Debug\GuiTerminal.lib") (Join-Path $packageRoot "build\native\lib\x64\Debug\GuiTerminal.lib") -Force
-Copy-Item (Join-Path $repoRoot "lib\x64\Debug\GuiTerminal.pdb") (Join-Path $packageRoot "build\native\lib\x64\Debug\GuiTerminal.pdb") -Force
-Copy-Item (Join-Path $repoRoot "lib\x64\Release\GuiTerminal.lib") (Join-Path $packageRoot "build\native\lib\x64\Release\GuiTerminal.lib") -Force
-Copy-Item (Join-Path $repoRoot "lib\x64\Release\GuiTerminal.pdb") (Join-Path $packageRoot "build\native\lib\x64\Release\GuiTerminal.pdb") -Force
+foreach ($build in $buildMatrix) {
+    $packagePlatform = if ($build.Platform -eq "Win32") { "Win32" } else { "x64" }
+    $packageLibDirectory = Join-Path $packageRoot ("build\native\lib\{0}\{1}\{2}" -f $packagePlatform, $build.PackageConfiguration, $build.RuntimeSubdir)
+    $builtLibDirectory = Join-Path $repoRoot ("lib\{0}\{1}\{2}" -f $build.PlatformTarget, $build.PackageConfiguration, $build.RuntimeSubdir)
+
+    New-Item -ItemType Directory -Force -Path $packageLibDirectory | Out-Null
+
+    Copy-Item (Join-Path $builtLibDirectory "GuiTerminal.lib") (Join-Path $packageLibDirectory "GuiTerminal.lib") -Force
+    Copy-Item (Join-Path $builtLibDirectory "GuiTerminal.pdb") (Join-Path $packageLibDirectory "GuiTerminal.pdb") -Force
+}
 
 Copy-Item (Join-Path $repoRoot "nuget\build\native\GuiTerminal.props") (Join-Path $packageRoot "build\native\GuiTerminal.props") -Force
 

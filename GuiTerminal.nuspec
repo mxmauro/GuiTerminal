@@ -14,14 +14,22 @@
   </metadata>
   <files>
     <file src="include\*.h" target="build\native\include" />
-    <file src="lib\x86\Debug\GuiTerminal.lib" target="build\native\lib\Win32\Debug" />
-    <file src="lib\x86\Debug\GuiTerminal.pdb" target="build\native\lib\Win32\Debug" />
-    <file src="lib\x86\Release\GuiTerminal.lib" target="build\native\lib\Win32\Release" />
-    <file src="lib\x86\Release\GuiTerminal.pdb" target="build\native\lib\Win32\Release" />
-    <file src="lib\x64\Debug\GuiTerminal.lib" target="build\native\lib\x64\Debug" />
-    <file src="lib\x64\Debug\GuiTerminal.pdb" target="build\native\lib\x64\Debug" />
-    <file src="lib\x64\Release\GuiTerminal.lib" target="build\native\lib\x64\Release" />
-    <file src="lib\x64\Release\GuiTerminal.pdb" target="build\native\lib\x64\Release" />
+    <file src="lib\x86\Debug\MT\GuiTerminal.lib" target="build\native\lib\Win32\Debug\MT" />
+    <file src="lib\x86\Debug\MT\GuiTerminal.pdb" target="build\native\lib\Win32\Debug\MT" />
+    <file src="lib\x86\Debug\MD\GuiTerminal.lib" target="build\native\lib\Win32\Debug\MD" />
+    <file src="lib\x86\Debug\MD\GuiTerminal.pdb" target="build\native\lib\Win32\Debug\MD" />
+    <file src="lib\x86\Release\MT\GuiTerminal.lib" target="build\native\lib\Win32\Release\MT" />
+    <file src="lib\x86\Release\MT\GuiTerminal.pdb" target="build\native\lib\Win32\Release\MT" />
+    <file src="lib\x86\Release\MD\GuiTerminal.lib" target="build\native\lib\Win32\Release\MD" />
+    <file src="lib\x86\Release\MD\GuiTerminal.pdb" target="build\native\lib\Win32\Release\MD" />
+    <file src="lib\x64\Debug\MT\GuiTerminal.lib" target="build\native\lib\x64\Debug\MT" />
+    <file src="lib\x64\Debug\MT\GuiTerminal.pdb" target="build\native\lib\x64\Debug\MT" />
+    <file src="lib\x64\Debug\MD\GuiTerminal.lib" target="build\native\lib\x64\Debug\MD" />
+    <file src="lib\x64\Debug\MD\GuiTerminal.pdb" target="build\native\lib\x64\Debug\MD" />
+    <file src="lib\x64\Release\MT\GuiTerminal.lib" target="build\native\lib\x64\Release\MT" />
+    <file src="lib\x64\Release\MT\GuiTerminal.pdb" target="build\native\lib\x64\Release\MT" />
+    <file src="lib\x64\Release\MD\GuiTerminal.lib" target="build\native\lib\x64\Release\MD" />
+    <file src="lib\x64\Release\MD\GuiTerminal.pdb" target="build\native\lib\x64\Release\MD" />
     <file src="nuget\build\native\GuiTerminal.props" target="build\native\GuiTerminal.props" />
     <file src="README.md" target="README.md" />
     <file src="LICENSE" target="LICENSE" />

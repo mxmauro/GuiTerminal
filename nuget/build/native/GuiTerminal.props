@@ -3,6 +3,10 @@
   <PropertyGroup>
     <GuiTerminalPlatform>$(Platform)</GuiTerminalPlatform>
     <GuiTerminalPlatform Condition="'$(GuiTerminalPlatform)'=='x86'">Win32</GuiTerminalPlatform>
+    <GuiTerminalConfiguration>Release</GuiTerminalConfiguration>
+    <GuiTerminalConfiguration Condition="'$(UseDebugLibraries)'=='true'">Debug</GuiTerminalConfiguration>
+    <GuiTerminalRuntimeSubdir>MT</GuiTerminalRuntimeSubdir>
+    <GuiTerminalRuntimeSubdir Condition="'$(RuntimeLibrary)'=='MultiThreadedDLL' Or '$(RuntimeLibrary)'=='MultiThreadedDebugDLL'">MD</GuiTerminalRuntimeSubdir>
   </PropertyGroup>
 
   <ItemDefinitionGroup>
@@ -11,7 +15,7 @@
     </ClCompile>
     <Link>
       <AdditionalDependencies>GuiTerminal.lib;d2d1.lib;dwrite.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>$(MSBuildThisFileDirectory)lib\$(GuiTerminalPlatform)\$(Configuration);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>$(MSBuildThisFileDirectory)lib\$(GuiTerminalPlatform)\$(GuiTerminalConfiguration)\$(GuiTerminalRuntimeSubdir);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>
 </Project>
