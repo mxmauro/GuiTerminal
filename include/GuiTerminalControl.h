@@ -2,6 +2,7 @@
 
 #include "GuiTerminalBuffer.h"
 #include "GuiTerminalRenderer.h"
+#include <cstdarg>
 #include <mutex>
 
 // -----------------------------------------------------------------------------
@@ -64,6 +65,8 @@ namespace GuiTerminal
         VOID Write(_In_z_ LPCWSTR szTextW) noexcept;
         // Format and write UTF-16 text to the default region.
         VOID Print(_In_z_ LPCWSTR szFormatW, ...) noexcept;
+        // Format and write UTF-16 text to the default region.
+        VOID PrintV(_In_z_ LPCWSTR szFormatW, _In_ va_list argList) noexcept;
 
         // Create a region inside the terminal in cell coordinates.
         HRESULT CreateRegion(_In_ INT iX, _In_ INT iY, _In_ INT iWidth, _In_ INT iHeight, _Out_ RegionHandle* lphRegion) noexcept;
@@ -85,6 +88,8 @@ namespace GuiTerminal
         VOID WriteRegion(_In_opt_ RegionHandle hRegion, _In_z_ LPCWSTR szTextW) noexcept;
         // Format and write UTF-16 text to a specific region.
         VOID PrintRegion(_In_opt_ RegionHandle hRegion, _In_z_ LPCWSTR szFormatW, ...) noexcept;
+        // Format and write UTF-16 text to a specific region.
+        VOID PrintRegionV(_In_opt_ RegionHandle hRegion, _In_z_ LPCWSTR szFormatW, _In_ va_list argList) noexcept;
 
         // Resize the logical terminal grid.
         HRESULT ResizeTerminal(_In_ INT iCols, _In_ INT iRows) noexcept;

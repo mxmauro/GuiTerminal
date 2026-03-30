@@ -245,17 +245,25 @@ namespace GuiTerminal
 
     VOID Control::Print(_In_z_ LPCWSTR szFormatW, ...) noexcept
     {
-        std::lock_guard<std::mutex> lockGuard(m_mutex);
-        std::wstring strTextW;
         va_list argList;
-        HRESULT hr;
 
         if (szFormatW)
         {
             va_start(argList, szFormatW);
-            hr = FormatWideStringV(szFormatW, argList, strTextW);
+            PrintV(szFormatW, argList);
             va_end(argList);
+        }
+    }
 
+    VOID Control::PrintV(_In_z_ LPCWSTR szFormatW, _In_ va_list argList) noexcept
+    {
+        std::lock_guard<std::mutex> lockGuard(m_mutex);
+        std::wstring strTextW;
+        HRESULT hr;
+
+        if (szFormatW)
+        {
+            hr = FormatWideStringV(szFormatW, argList, strTextW);
             if (SUCCEEDED(hr))
             {
                 Internals::Parser m_sParser(m_sBuffer, nullptr);
@@ -330,17 +338,25 @@ namespace GuiTerminal
 
     VOID Control::PrintRegion(_In_opt_ RegionHandle hRegion, _In_z_ LPCWSTR szFormatW, ...) noexcept
     {
-        std::lock_guard<std::mutex> lockGuard(m_mutex);
-        std::wstring strTextW;
         va_list argList;
-        HRESULT hr;
 
         if (szFormatW)
         {
             va_start(argList, szFormatW);
-            hr = FormatWideStringV(szFormatW, argList, strTextW);
+            PrintRegionV(hRegion, szFormatW, argList);
             va_end(argList);
+        }
+    }
 
+    VOID Control::PrintRegionV(_In_opt_ RegionHandle hRegion, _In_z_ LPCWSTR szFormatW, _In_ va_list argList) noexcept
+    {
+        std::lock_guard<std::mutex> lockGuard(m_mutex);
+        std::wstring strTextW;
+        HRESULT hr;
+
+        if (szFormatW)
+        {
+            hr = FormatWideStringV(szFormatW, argList, strTextW);
             if (SUCCEEDED(hr))
             {
                 Internals::Parser m_sParser(m_sBuffer, hRegion);

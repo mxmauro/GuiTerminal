@@ -2,14 +2,13 @@
   <Configurations>
     <Platform Name="Win32" />
     <Platform Name="x64" />
-    <BuildType Name="DebugMD" />
-    <BuildType Name="DebugMT" />
-    <BuildType Name="ReleaseMD" />
-    <BuildType Name="ReleaseMT" />
+    <BuildType Name="Debug" />
+    <BuildType Name="Release" />
   </Configurations>
   <Project Path="demo\GuiTerminalDemo.vcxproj" Id="bd93cd13-dcc2-400e-894c-ac85afd8f08c">
     <BuildDependency Project="GuiTerminal.vcxproj" />
   </Project>
   <Project Path="GuiTerminal.vcxproj" Id="d5688494-3fff-4319-8dce-79b15294ed14" />
+  <Project Path="GuiTerminalDll.vcxproj" Id="a7680317-5a86-47f4-82d4-8013e2fa4f33" />
 </Solution>
 

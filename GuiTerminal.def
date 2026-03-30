@@ -1,0 +1,23 @@
+LIBRARY GuiTerminal
+EXPORTS
+    GuiTerminalControl_Create
+    GuiTerminalControl_WndProc
+    GuiTerminalControl_GetFromWindow
+    GuiTerminalControl_Clear
+    GuiTerminalControl_Scroll
+    GuiTerminalControl_FillArea
+    GuiTerminalControl_Write
+    GuiTerminalControl_Print
+    GuiTerminalControl_PrintV
+    GuiTerminalControl_CreateRegion
+    GuiTerminalControl_DestroyRegion
+    GuiTerminalControl_ClearRegion
+    GuiTerminalControl_ScrollRegion
+    GuiTerminalControl_FillRegionArea
+    GuiTerminalControl_WriteRegion
+    GuiTerminalControl_PrintRegion
+    GuiTerminalControl_PrintRegionV
+    GuiTerminalControl_ResizeTerminal
+    GuiTerminalControl_GetCellSize
+    GuiTerminalControl_GetPreferredClientSize
+    GuiTerminalControl_GetPreferredWindowSize

@@ -10,8 +10,9 @@
 *.ilk
 /.vs/
 /bin/
+/build/
 /lib/
 /obj/
-/nuget/artifacts/
-*.nupkg
-*.snupkg
+/out/
+/demo/bin/
+/demo/obj/
