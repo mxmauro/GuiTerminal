@@ -334,7 +334,7 @@ if ($SourceMode -eq "GitHub") {
     }
 
     $portfile = @"
-if(VCPKG_LIBRARY_LINKAGE STREQUAL ""dynamic"")
+if(VCPKG_LIBRARY_LINKAGE STREQUAL "dynamic")
     set($CMakeSharedOption ON)
 else()
     set($CMakeSharedOption OFF)
@@ -368,7 +368,7 @@ vcpkg_install_copyright(FILE_LIST "`${SOURCE_PATH}/LICENSE")
     # source tree instead of fetching from GitHub.
     $normalizedSourcePath = Normalize-PathForCMake -Path $SourcePath
     $portfile = @"
-if(VCPKG_LIBRARY_LINKAGE STREQUAL ""dynamic"")
+if(VCPKG_LIBRARY_LINKAGE STREQUAL "dynamic")
     set($CMakeSharedOption ON)
 else()
     set($CMakeSharedOption OFF)

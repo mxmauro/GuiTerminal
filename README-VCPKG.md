@@ -9,7 +9,7 @@ This document describes how to test and publish `guiterminal` into the public re
 - Git installed and authenticated for the repositories you will push.
 - For automated publishing from GitHub Actions, a secret named `VCPKG_REGISTRY_PAT` with write access to `mxmauro/vcpkg-registry`.
   - Minimum for the current workflow: repository `Contents: Read and write`.
-  - If you later switch the workflow to open PRs instead of pushing directly, also grant `Pull requests: Read and write`.
+  - Also required for the current workflow: `Pull requests: Read and write`.
 
 ## Dry-run test flow
 

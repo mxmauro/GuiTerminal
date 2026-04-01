@@ -13,7 +13,7 @@ jobs:
     runs-on: windows-2025-vs2026
     steps:
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Prepare release metadata
         id: metadata
@@ -25,46 +25,43 @@ jobs:
             throw "Tag '$tag' does not match the required format: v<major>.<minor>.<patch> or v<major>.<minor>.<patch>-<suffix>."
           }
           $version = $tag.Substring(1)
+          $sanitizedVersion = $version -replace '[^a-zA-Z0-9]', '_'
           "tag=$tag" >> $env:GITHUB_OUTPUT
           "version=$version" >> $env:GITHUB_OUTPUT
+          "branch_suffix=$sanitizedVersion" >> $env:GITHUB_OUTPUT
 
-      - name: Clone registry repository
-        id: clone
-        shell: pwsh
-        env:
-          VCPKG_REGISTRY_PAT: ${{ secrets.VCPKG_REGISTRY_PAT }}
-        run: |
-          if ([string]::IsNullOrWhiteSpace($env:VCPKG_REGISTRY_PAT)) {
-            throw "Missing required secret: VCPKG_REGISTRY_PAT"
-          }
-          $registryPath = Join-Path $env:RUNNER_TEMP "vcpkg-registry"
-          git clone "https://x-access-token:$env:VCPKG_REGISTRY_PAT@github.com/mxmauro/vcpkg-registry.git" $registryPath
-          "registry_path=$registryPath" >> $env:GITHUB_OUTPUT
+      - name: Check out registry repository
+        uses: actions/checkout@v6
+        with:
+          repository: mxmauro/vcpkg-registry
+          ref: master
+          token: ${{ secrets.VCPKG_REGISTRY_PAT }}
+          path: vcpkg-registry
 
       - name: Generate registry update
         shell: pwsh
         run: |
           .\scripts\build-vcpkg-registry.ps1 `
-            -RegistryPath "${{ steps.clone.outputs.registry_path }}" `
+            -RegistryPath "${{ github.workspace }}\vcpkg-registry" `
             -RegistryKind Git `
             -SourceMode GitHub `
             -Version "${{ steps.metadata.outputs.version }}" `
             -SourceRef "${{ steps.metadata.outputs.tag }}" `
             -GitHubRepository "${{ github.repository }}"
 
-      - name: Commit and push registry update
-        shell: pwsh
-        env:
-          VCPKG_REGISTRY_PAT: ${{ secrets.VCPKG_REGISTRY_PAT }}
-        run: |
-          $registryPath = "${{ steps.clone.outputs.registry_path }}"
-          $status = git -C $registryPath status --porcelain
-          if ([string]::IsNullOrWhiteSpace($status)) {
-            Write-Output "No registry changes to commit."
-            exit 0
-          }
-          git -C $registryPath config user.name "github-actions[bot]"
-          git -C $registryPath config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git -C $registryPath add ports versions
-          git -C $registryPath commit -m "Add guiterminal ${{ steps.metadata.outputs.version }}"
-          git -C $registryPath push "https://x-access-token:$env:VCPKG_REGISTRY_PAT@github.com/mxmauro/vcpkg-registry.git" HEAD:main
+      - name: Create registry pull request
+        uses: peter-evans/create-pull-request@v8
+        with:
+          token: ${{ secrets.VCPKG_REGISTRY_PAT }}
+          path: vcpkg-registry
+          base: master
+          branch: update-guiterminal-${{ steps.metadata.outputs.branch_suffix }}
+          delete-branch: true
+          commit-message: "Add GuiTerminal ${{ steps.metadata.outputs.version }}"
+          title: "Add GuiTerminal ${{ steps.metadata.outputs.version }}"
+          body: |
+            Automated registry update for `${{ github.repository }}` tag `${{ steps.metadata.outputs.tag }}`.
+          add-paths: |
+            ports/guiterminal
+            versions/baseline.json
+            versions/g-/guiterminal.json
