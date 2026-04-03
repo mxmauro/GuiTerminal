@@ -140,7 +140,7 @@ namespace GuiTerminal::Internals
 
     VOID Buffer::ClearRegion(_In_opt_ RegionHandle hRegion) noexcept
     {
-        if (hRegion == nullptr)
+        if (!hRegion)
         {
             hRegion = &m_mapRegions.find(0)->second;
         }
@@ -176,7 +176,7 @@ namespace GuiTerminal::Internals
         {
             return;
         }
-        if (hRegion == nullptr)
+        if (!hRegion)
         {
             hRegion = &m_mapRegions.find(0)->second;
         }
@@ -212,7 +212,7 @@ namespace GuiTerminal::Internals
 
     VOID Buffer::ResetAttributes(_In_opt_ RegionHandle hRegion) noexcept
     {
-        if (hRegion == nullptr)
+        if (!hRegion)
         {
             hRegion = &m_mapRegions.find(0)->second;
         }
@@ -224,7 +224,7 @@ namespace GuiTerminal::Internals
         INT iAbsoluteX;
         INT iAbsoluteY;
 
-        if (hRegion == nullptr)
+        if (!hRegion)
         {
             hRegion = &m_mapRegions.find(0)->second;
         }
@@ -249,7 +249,7 @@ namespace GuiTerminal::Internals
 
     VOID Buffer::ProcessControl(_In_opt_ RegionHandle hRegion, _In_ WCHAR chCodepointW) noexcept
     {
-        if (hRegion == nullptr)
+        if (!hRegion)
         {
             hRegion = &m_mapRegions.find(0)->second;
         }
@@ -288,7 +288,7 @@ namespace GuiTerminal::Internals
 
     VOID Buffer::MoveCursorRelative(_In_opt_ RegionHandle hRegion, _In_ INT iDeltaX, _In_ INT iDeltaY) noexcept
     {
-        if (hRegion == nullptr)
+        if (!hRegion)
         {
             hRegion = &m_mapRegions.find(0)->second;
         }
@@ -300,7 +300,7 @@ namespace GuiTerminal::Internals
 
     VOID Buffer::SetCursorPosition(_In_opt_ RegionHandle hRegion, _In_ INT iRowOneBased, _In_ INT iColOneBased) noexcept
     {
-        if (hRegion == nullptr)
+        if (!hRegion)
         {
             hRegion = &m_mapRegions.find(0)->second;
         }
@@ -312,7 +312,7 @@ namespace GuiTerminal::Internals
 
     VOID Buffer::SetCursorColumn(_In_opt_ RegionHandle hRegion, _In_ INT iColOneBased) noexcept
     {
-        if (hRegion == nullptr)
+        if (!hRegion)
         {
             hRegion = &m_mapRegions.find(0)->second;
         }
@@ -322,7 +322,7 @@ namespace GuiTerminal::Internals
 
     VOID Buffer::SetCursorRow(_In_opt_ RegionHandle hRegion, _In_ INT iRowOneBased) noexcept
     {
-        if (hRegion == nullptr)
+        if (!hRegion)
         {
             hRegion = &m_mapRegions.find(0)->second;
         }
@@ -336,7 +336,7 @@ namespace GuiTerminal::Internals
         INT iEndX;
         INT iX;
 
-        if (hRegion == nullptr)
+        if (!hRegion)
         {
             hRegion = &m_mapRegions.find(0)->second;
         }
@@ -366,7 +366,7 @@ namespace GuiTerminal::Internals
         INT iXEnd;
         INT iX;
 
-        if (hRegion == nullptr)
+        if (!hRegion)
         {
             hRegion = &m_mapRegions.find(0)->second;
         }
@@ -413,7 +413,7 @@ namespace GuiTerminal::Internals
         SIZE_T uIndex;
         INT iValue;
 
-        if (hRegion == nullptr)
+        if (!hRegion)
         {
             hRegion = &m_mapRegions.find(0)->second;
         }
@@ -507,7 +507,7 @@ namespace GuiTerminal::Internals
         Region_s regionCurrent;
         HRESULT hr;
 
-        if (lphRegion == nullptr)
+        if (!lphRegion)
         {
             return E_POINTER;
         }
@@ -545,7 +545,7 @@ namespace GuiTerminal::Internals
 
     HRESULT Buffer::DestroyRegion(_In_ RegionHandle hRegion) noexcept
     {
-        if ((hRegion == nullptr) || (hRegion->iId == m_mapRegions.find(0)->second.iId))
+        if ((!hRegion) || hRegion->iId == m_mapRegions.find(0)->second.iId)
         {
             return E_INVALIDARG;
         }
@@ -568,9 +568,69 @@ namespace GuiTerminal::Internals
         return S_OK;
     }
 
+    HRESULT Buffer::RelocateRegion(_In_ RegionHandle hRegion, _In_ INT iX, _In_ INT iY, _In_ INT iWidth, _In_ INT iHeight) noexcept
+    {
+        if ((!hRegion) || hRegion->iId == m_mapRegions.find(0)->second.iId)
+        {
+            return E_INVALIDARG;
+        }
+        hRegion->iX = ClampInt(iX, 0, m_iCols - 1);
+        hRegion->iY = ClampInt(iY, 0, m_iRows - 1);
+        hRegion->iWidth = ClampInt(iWidth, 1, m_iCols - hRegion->iX);
+        hRegion->iHeight = ClampInt(iHeight, 1, m_iRows - hRegion->iY);
+        hRegion->iCursorX = ClampInt(hRegion->iCursorX, 0, hRegion->iWidth - 1);
+        hRegion->iCursorY = ClampInt(hRegion->iCursorY, 0, hRegion->iHeight - 1);
+        hRegion->sCursorSaved.iX = ClampInt(hRegion->sCursorSaved.iX, 0, hRegion->iWidth - 1);
+        hRegion->sCursorSaved.iY = ClampInt(hRegion->sCursorSaved.iY, 0, hRegion->iHeight - 1);
+        return S_OK;
+    }
+
+    VOID Buffer::GetRegionLocation(_In_ RegionHandle hRegion, _Out_opt_ LPINT lpiX, _Out_opt_ LPINT lpiY, _Out_opt_ LPINT lpiWidth,
+                                   _Out_opt_ LPINT lpiHeight) const noexcept
+    {
+        if (hRegion && hRegion->iId != m_mapRegions.find(0)->second.iId)
+        {
+            if (lpiX)
+            {
+                *lpiX = hRegion->iX;
+            }
+            if (lpiY)
+            {
+                *lpiY = hRegion->iY;
+            }
+            if (lpiWidth)
+            {
+                *lpiWidth = hRegion->iWidth;
+            }
+            if (lpiHeight)
+            {
+                *lpiHeight = hRegion->iHeight;
+            }
+        }
+        else
+        {
+            if (lpiX)
+            {
+                *lpiX = 0;
+            }
+            if (lpiY)
+            {
+                *lpiY = 0;
+            }
+            if (lpiWidth)
+            {
+                *lpiWidth = m_iCols;
+            }
+            if (lpiHeight)
+            {
+                *lpiHeight = m_iRows;
+            }
+        }
+    }
+
     VOID Buffer::SaveCursor(_In_opt_ RegionHandle hRegion) noexcept
     {
-        if (hRegion == nullptr)
+        if (!hRegion)
         {
             hRegion = &m_mapRegions.find(0)->second;
         }
@@ -581,7 +641,7 @@ namespace GuiTerminal::Internals
 
     VOID Buffer::RestoreCursor(_In_opt_ RegionHandle hRegion) noexcept
     {
-        if (hRegion == nullptr)
+        if (!hRegion)
         {
             hRegion = &m_mapRegions.find(0)->second;
         }
@@ -651,11 +711,11 @@ namespace GuiTerminal::Internals
 
     HRESULT Buffer::ValidateRegionBounds(_In_ INT iX, _In_ INT iY, _In_ INT iWidth, _In_ INT iHeight) const noexcept
     {
-        if ((iX < 0) || (iY < 0) || (iWidth <= 0) || (iHeight <= 0))
+        if (iX < 0 || iY < 0 || iWidth <= 0 || iHeight <= 0)
         {
             return E_INVALIDARG;
         }
-        if ((iX + iWidth > m_iCols) || (iY + iHeight > m_iRows))
+        if (iX + iWidth > m_iCols || iY + iHeight > m_iRows)
         {
             return E_INVALIDARG;
         }
@@ -708,7 +768,7 @@ namespace GuiTerminal::Internals
         SIZE_T uSourceIndex;
         SIZE_T uTargetIndex;
 
-        if (hRegion == nullptr)
+        if (!hRegion)
         {
             hRegion = &m_mapRegions.find(0)->second;
         }
@@ -746,7 +806,7 @@ namespace GuiTerminal::Internals
         SIZE_T uSourceIndex;
         SIZE_T uTargetIndex;
 
-        if (hRegion == nullptr)
+        if (!hRegion)
         {
             hRegion = &m_mapRegions.find(0)->second;
         }
@@ -778,7 +838,7 @@ namespace GuiTerminal::Internals
 
     VOID Buffer::AdvanceCursorAfterWrite(_In_opt_ RegionHandle hRegion) noexcept
     {
-        if (hRegion == nullptr)
+        if (!hRegion)
         {
             hRegion = &m_mapRegions.find(0)->second;
         }
@@ -858,7 +918,7 @@ namespace GuiTerminal::Internals
         INT iNextStop;
         INT iStop;
 
-        if (hRegion == nullptr)
+        if (!hRegion)
         {
             hRegion = &m_mapRegions.find(0)->second;
         }

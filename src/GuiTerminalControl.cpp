@@ -37,7 +37,7 @@ namespace GuiTerminal
         }
 
         lpControl = new (std::nothrow) Control();
-        if (lpControl == nullptr)
+        if (!lpControl)
         {
             return E_OUTOFMEMORY;
         }
@@ -65,9 +65,13 @@ namespace GuiTerminal
     {
         Control* lpControl;
 
-        lpControl = reinterpret_cast<Control*>(GetWindowLongPtrW(hWnd, GWLP_USERDATA));
-
+        if (!lplResult)
+        {
+            return FALSE;
+        }
         *lplResult = 0L;
+
+        lpControl = reinterpret_cast<Control*>(GetWindowLongPtrW(hWnd, GWLP_USERDATA));
         if ((!lpControl) || hWnd != lpControl->m_hWnd)
         {
             return FALSE;
@@ -75,17 +79,21 @@ namespace GuiTerminal
 
         switch (uMessage)
         {
+            case WM_ERASEBKGND:
+                *lplResult = 1;
+                return TRUE;
+
             case WM_PAINT:
                 {
-                    PAINTSTRUCT ps;
+                    PAINTSTRUCT sPs;
 
-                    if (BeginPaint(hWnd, &ps) != nullptr)
+                    if (BeginPaint(hWnd, &sPs))
                     {
                         lpControl->Present();
-                        EndPaint(hWnd, &ps);
+                        EndPaint(hWnd, &sPs);
                     }
 
-                    *lplResult = 0;
+
                     return TRUE;
                 }
 
@@ -99,13 +107,15 @@ namespace GuiTerminal
                                                       static_cast<UINT>(rcClient.bottom - rcClient.top));
                         InvalidateRect(hWnd, nullptr, FALSE);
                     }
+
                 }
-                *lplResult = 0;
-                return TRUE;
+                break;
 
             case WM_DPICHANGED:
                 {
-                    LPRECT lprcSuggested = reinterpret_cast<LPRECT>(lParam);
+                    LPRECT lprcSuggested;
+
+                    lprcSuggested = reinterpret_cast<LPRECT>(lParam);
                     if (lprcSuggested)
                     {
                         SetWindowPos(hWnd, nullptr, lprcSuggested->left, lprcSuggested->top,
@@ -115,14 +125,12 @@ namespace GuiTerminal
                     lpControl->RefreshDpi();
                     InvalidateRect(hWnd, nullptr, FALSE);
                 }
-                *lplResult = 0;
-                return TRUE;
+                break;
 
             case WM_MOUSEMOVE:
                 if (lpControl->HandleMouseMove(GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)) != FALSE)
                 {
                     InvalidateRect(hWnd, nullptr, FALSE);
-                    *lplResult = 0;
                     return TRUE;
                 }
                 break;
@@ -131,7 +139,6 @@ namespace GuiTerminal
                 if (lpControl->HandleMouseLeave() != FALSE)
                 {
                     InvalidateRect(hWnd, nullptr, FALSE);
-                    *lplResult = 0;
                     return TRUE;
                 }
                 break;
@@ -144,7 +151,6 @@ namespace GuiTerminal
                         SetCapture(hWnd);
                     }
                     InvalidateRect(hWnd, nullptr, FALSE);
-                    *lplResult = 0;
                     return TRUE;
                 }
                 break;
@@ -157,7 +163,6 @@ namespace GuiTerminal
                         ReleaseCapture();
                     }
                     InvalidateRect(hWnd, nullptr, FALSE);
-                    *lplResult = 0;
                     return TRUE;
                 }
                 break;
@@ -166,7 +171,6 @@ namespace GuiTerminal
                 if (lpControl->HandleMouseWheel(GET_WHEEL_DELTA_WPARAM(wParam)) != FALSE)
                 {
                     InvalidateRect(hWnd, nullptr, FALSE);
-                    *lplResult = 0;
                     return TRUE;
                 }
                 break;
@@ -176,7 +180,6 @@ namespace GuiTerminal
                 {
                     lpControl->ToggleBlink();
                     InvalidateRect(hWnd, nullptr, FALSE);
-                    *lplResult = 0;
                     return TRUE;
                 }
                 break;
@@ -193,11 +196,10 @@ namespace GuiTerminal
 
                 SetWindowLongPtrW(hWnd, GWLP_USERDATA, 0);
                 delete lpControl;
-
-                *lplResult = 0;
-                return TRUE;
+                break;
         }
 
+        // Done
         return FALSE;
     }
 
@@ -362,6 +364,51 @@ namespace GuiTerminal
                 Internals::Parser m_sParser(m_sBuffer, hRegion);
 
                 m_sParser.Feed(strTextW.c_str());
+            }
+        }
+    }
+
+    HRESULT Control::RelocateRegion(_In_ RegionHandle hRegion, _In_ INT iX, _In_ INT iY, _In_ INT iWidth, _In_ INT iHeight) noexcept
+    {
+        std::lock_guard<std::mutex> lockGuard(m_mutex);
+
+        if (!hRegion)
+        {
+            return E_POINTER;
+        }
+        if (iWidth <= 0 || iHeight <= 0)
+        {
+            return E_INVALIDARG;
+        }
+        return m_sBuffer.RelocateRegion(hRegion, iX, iY, iWidth, iHeight);
+    }
+
+    VOID Control::GetRegionLocation(_In_opt_ RegionHandle hRegion, _Out_opt_ LPINT lpiX, _Out_opt_ LPINT lpiY, _Out_opt_ LPINT lpiWidth,
+                                    _Out_opt_ LPINT lpiHeight) const noexcept
+    {
+        std::lock_guard<std::mutex> lockGuard(m_mutex);
+
+        if (hRegion)
+        {
+            m_sBuffer.GetRegionLocation(hRegion, lpiX, lpiY, lpiWidth, lpiHeight);
+        }
+        else
+        {
+            if (lpiX)
+            {
+                *lpiX = 0;
+            }
+            if (lpiY)
+            {
+                *lpiY = 0;
+            }
+            if (lpiWidth)
+            {
+                *lpiWidth = m_iCols;
+            }
+            if (lpiHeight)
+            {
+                *lpiHeight = m_iRows;
             }
         }
     }

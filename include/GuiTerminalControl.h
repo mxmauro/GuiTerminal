@@ -91,6 +91,13 @@ namespace GuiTerminal
         // Format and write UTF-16 text to a specific region.
         VOID PrintRegionV(_In_opt_ RegionHandle hRegion, _In_z_ LPCWSTR szFormatW, _In_ va_list argList) noexcept;
 
+        // Relocates the specified region.
+        HRESULT RelocateRegion(_In_ RegionHandle hRegion, _In_ INT iX, _In_ INT iY, _In_ INT iWidth, _In_ INT iHeight) noexcept;
+
+        // Gets the location of the specified region in cell coordinates.
+        VOID GetRegionLocation(_In_opt_ RegionHandle hRegion, _Out_opt_ LPINT lpiX, _Out_opt_ LPINT lpiY, _Out_opt_ LPINT lpiWidth,
+                               _Out_opt_ LPINT lpiHeight) const noexcept;
+
         // Resize the logical terminal grid.
         HRESULT ResizeTerminal(_In_ INT iCols, _In_ INT iRows) noexcept;
 

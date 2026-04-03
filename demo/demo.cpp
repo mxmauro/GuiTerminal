@@ -86,10 +86,11 @@ static HRESULT CreateMainWindow(_In_ HINSTANCE hInstance, _In_ INT nCmdShow, _In
     WNDCLASSEXW sWcExW;
     HWND hWnd;
 
-    if (lphWnd == nullptr)
+    if (!lphWnd)
     {
         return E_POINTER;
     }
+    *lphWnd = nullptr;
 
     memset(&sWcExW, 0, sizeof(sWcExW));
     sWcExW.cbSize = sizeof(sWcExW);
@@ -111,7 +112,7 @@ static HRESULT CreateMainWindow(_In_ HINSTANCE hInstance, _In_ INT nCmdShow, _In
 
     hWnd = CreateWindowExW(0, szWindowClassW, szTitleW, WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT, 1280, 720, nullptr, nullptr,
                            hInstance, nullptr);
-    if (hWnd == nullptr)
+    if (!hWnd)
     {
         return HRESULT_FROM_WIN32(GetLastError());
     }

@@ -131,19 +131,19 @@ HRESULT GuiTerminalControl_CreateRegion(_In_ GuiTerminalControl *lpControl, _In_
     return hr;
 }
 
-VOID GuiTerminalControl_DestroyRegion(_In_ GuiTerminalControl *lpControl, _In_ GuiTerminalRegion hRegion)
-{
-    if (lpControl)
-    {
-        ToCppControl(lpControl)->DestroyRegion(ToCppRegion(hRegion));
-    }
-}
-
 VOID GuiTerminalControl_ClearRegion(_In_ GuiTerminalControl *lpControl, _In_ GuiTerminalRegion hRegion)
 {
     if (lpControl)
     {
         ToCppControl(lpControl)->ClearRegion(ToCppRegion(hRegion));
+    }
+}
+
+VOID GuiTerminalControl_DestroyRegion(_In_ GuiTerminalControl *lpControl, _In_ GuiTerminalRegion hRegion)
+{
+    if (lpControl)
+    {
+        ToCppControl(lpControl)->DestroyRegion(ToCppRegion(hRegion));
     }
 }
 
@@ -194,6 +194,45 @@ VOID GuiTerminalControl_PrintRegionV(_In_ GuiTerminalControl *lpControl, _In_ Gu
         ToCppControl(lpControl)->PrintRegionV(ToCppRegion(hRegion), szFormatW, argList);
     }
 }
+
+HRESULT GuiTerminalControl_RelocateRegion(_In_ GuiTerminalControl *lpControl, _In_ GuiTerminalRegion hRegion, _In_ INT iX, _In_ INT iY,
+                                          _In_ INT iWidth, _In_ INT iHeight)
+{
+    if (!lpControl)
+    {
+        return E_POINTER;
+    }
+    return ToCppControl(lpControl)->RelocateRegion(ToCppRegion(hRegion), iX, iY, iWidth, iHeight);
+}
+
+VOID GuiTerminalControl_GetRegionLocation(_In_ GuiTerminalControl *lpControl, _In_opt_  GuiTerminalRegion hRegion, _Out_opt_ LPINT lpiX,
+                                          _Out_opt_ LPINT lpiY, _Out_opt_ LPINT lpiWidth, _Out_opt_ LPINT lpiHeight)
+{
+    if (lpControl)
+    {
+        ToCppControl(lpControl)->GetRegionLocation(ToCppRegion(hRegion), lpiX, lpiY, lpiWidth, lpiHeight);
+    }
+    else
+    {
+        if (lpiX)
+        {
+            *lpiX = 0;
+        }
+        if (lpiY)
+        {
+            *lpiY = 0;
+        }
+        if (lpiWidth)
+        {
+            *lpiWidth = 0;
+        }
+        if (lpiHeight)
+        {
+            *lpiHeight = 0;
+        }
+    }
+}
+
 
 HRESULT GuiTerminalControl_ResizeTerminal(_In_ GuiTerminalControl *lpControl, _In_ INT iCols, _In_ INT iRows)
 {

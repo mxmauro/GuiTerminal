@@ -71,9 +71,9 @@ GUITERMINAL_CONTROL_API
 HRESULT GuiTerminalControl_CreateRegion(_In_ GuiTerminalControl* lpControl, _In_ INT iX, _In_ INT iY, _In_ INT iWidth, _In_ INT iHeight,
                                         _Out_ GuiTerminalRegion* lphRegion);
 GUITERMINAL_CONTROL_API
-VOID GuiTerminalControl_DestroyRegion(_In_ GuiTerminalControl* lpControl, _In_ GuiTerminalRegion hRegion);
-GUITERMINAL_CONTROL_API
 VOID GuiTerminalControl_ClearRegion(_In_ GuiTerminalControl* lpControl, _In_ GuiTerminalRegion hRegion);
+GUITERMINAL_CONTROL_API
+VOID GuiTerminalControl_DestroyRegion(_In_ GuiTerminalControl *lpControl, _In_ GuiTerminalRegion hRegion);
 GUITERMINAL_CONTROL_API
 VOID GuiTerminalControl_ScrollRegion(_In_ GuiTerminalControl* lpControl, _In_ GuiTerminalRegion hRegion, _In_ INT iLineCount);
 GUITERMINAL_CONTROL_API
@@ -87,6 +87,13 @@ VOID GuiTerminalControl_PrintRegion(_In_ GuiTerminalControl* lpControl, _In_ Gui
 GUITERMINAL_CONTROL_API
 VOID GuiTerminalControl_PrintRegionV(_In_ GuiTerminalControl *lpControl, _In_ GuiTerminalRegion hRegion, _In_z_ LPCWSTR szFormatW,
                                      _In_ va_list argList);
+
+GUITERMINAL_CONTROL_API
+HRESULT GuiTerminalControl_RelocateRegion(_In_ GuiTerminalControl *lpControl, _In_ GuiTerminalRegion hRegion, _In_ INT iX, _In_ INT iY,
+                                          _In_ INT iWidth, _In_ INT iHeight);
+GUITERMINAL_CONTROL_API
+VOID GuiTerminalControl_GetRegionLocation(_In_ GuiTerminalControl *lpControl, _In_opt_  GuiTerminalRegion hRegion, _Out_opt_ LPINT lpiX,
+                                          _Out_opt_ LPINT lpiY, _Out_opt_ LPINT lpiWidth, _Out_opt_ LPINT lpiHeight);
 
 GUITERMINAL_CONTROL_API
 HRESULT GuiTerminalControl_ResizeTerminal(_In_ GuiTerminalControl* lpControl, _In_ INT iCols, _In_ INT iRows);

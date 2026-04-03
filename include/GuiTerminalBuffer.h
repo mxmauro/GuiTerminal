@@ -105,6 +105,10 @@ namespace GuiTerminal
             HRESULT CreateRegion(_In_ INT iX, _In_ INT iY, _In_ INT iWidth, _In_ INT iHeight, _Out_ RegionHandle* lphRegion) noexcept;
             HRESULT DestroyRegion(_In_ RegionHandle hRegion) noexcept;
 
+            HRESULT RelocateRegion(_In_ RegionHandle hRegion, _In_ INT iX, _In_ INT iY, _In_ INT iWidth, _In_ INT iHeight) noexcept;
+            VOID GetRegionLocation(_In_ RegionHandle hRegion, _Out_opt_ LPINT lpiX, _Out_opt_ LPINT lpiY, _Out_opt_ LPINT lpiWidth,
+                                   _Out_opt_ LPINT lpiHeight) const noexcept;
+
             VOID SaveCursor(_In_opt_ RegionHandle hRegion) noexcept;
             VOID RestoreCursor(_In_opt_ RegionHandle hRegion) noexcept;
 
