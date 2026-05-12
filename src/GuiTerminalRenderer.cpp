@@ -122,14 +122,42 @@ namespace GuiTerminal::Internals
         return hr;
     }
 
+    BOOL Renderer::GetCellPosition(_In_ INT iCol, _In_ INT iRow, _Out_ LPRECT lprcCell) const noexcept
+    {
+        FLOAT fOriginX;
+        FLOAT fOriginY;
+
+        if (!lprcCell)
+        {
+            return FALSE;
+        }
+        lprcCell->left = 0;
+        lprcCell->top = 0;
+        lprcCell->right = 0;
+        lprcCell->bottom = 0;
+
+        if ((iCol < 0) || (iCol >= m_iCols) || (iRow < 0) || (iRow >= m_iRows))
+        {
+            return FALSE;
+        }
+
+        fOriginX = m_fGridOffsetX + (m_metricsFont.fCellWidth * static_cast<FLOAT>(iCol));
+        fOriginY = m_fGridOffsetY + (m_metricsFont.fCellHeight * static_cast<FLOAT>(iRow));
+        lprcCell->left = DipsToPixelsX(fOriginX);
+        lprcCell->top = DipsToPixelsY(fOriginY);
+        lprcCell->right = DipsToPixelsX(fOriginX + m_metricsFont.fCellWidth);
+        lprcCell->bottom = DipsToPixelsY(fOriginY + m_metricsFont.fCellHeight);
+        return TRUE;
+    }
+
     HRESULT Renderer::GetCellSize(_Out_ LPSIZE lpSize) const noexcept
     {
         if (!lpSize)
         {
             return E_POINTER;
         }
-        lpSize->cx = static_cast<LONG>(std::lround(m_metricsFont.fCellWidth));
-        lpSize->cy = static_cast<LONG>(std::lround(m_metricsFont.fCellHeight));
+        lpSize->cx = static_cast<LONG>(DipsToPixelsX(m_metricsFont.fCellWidth));
+        lpSize->cy = static_cast<LONG>(DipsToPixelsY(m_metricsFont.fCellHeight));
         return S_OK;
     }
 
@@ -139,8 +167,8 @@ namespace GuiTerminal::Internals
         {
             return E_POINTER;
         }
-        lpSize->cx = static_cast<LONG>(std::lround(m_metricsFont.fCellWidth * static_cast<FLOAT>(iCols)));
-        lpSize->cy = static_cast<LONG>(std::lround(m_metricsFont.fCellHeight * static_cast<FLOAT>(iRows)));
+        lpSize->cx = static_cast<LONG>(DipsToPixelsX(m_metricsFont.fCellWidth * static_cast<FLOAT>(iCols)));
+        lpSize->cy = static_cast<LONG>(DipsToPixelsY(m_metricsFont.fCellHeight * static_cast<FLOAT>(iRows)));
         return S_OK;
     }
 
@@ -159,6 +187,57 @@ namespace GuiTerminal::Internals
     BOOL Renderer::HasVisibleScrollBars() const noexcept
     {
         return ((m_scrollBarHorizontal.bVisible != FALSE) || (m_scrollBarVertical.bVisible != FALSE)) ? TRUE : FALSE;
+    }
+
+    BOOL Renderer::HitTestCell(_In_ INT iX, _In_ INT iY, _Out_opt_ LPINT lpiCol, _Out_opt_ LPINT lpiRow) const noexcept
+    {
+        FLOAT fPointerX;
+        FLOAT fPointerY;
+        FLOAT fContentX;
+        FLOAT fContentY;
+        INT iCol;
+        INT iRow;
+
+        if (lpiCol)
+        {
+            *lpiCol = 0;
+        }
+        if (lpiRow)
+        {
+            *lpiRow = 0;
+        }
+
+        if ((m_iCols <= 0) || (m_iRows <= 0) || (m_metricsFont.fCellWidth <= 0.0f) || (m_metricsFont.fCellHeight <= 0.0f))
+        {
+            return FALSE;
+        }
+        fPointerX = PixelsToDipsX(iX);
+        fPointerY = PixelsToDipsY(iY);
+        if ((fPointerX < m_rcViewport.left) || (fPointerX >= m_rcViewport.right) || (fPointerY < m_rcViewport.top) ||
+            (fPointerY >= m_rcViewport.bottom))
+        {
+            return FALSE;
+        }
+
+        fContentX = fPointerX - m_fGridOffsetX;
+        fContentY = fPointerY - m_fGridOffsetY;
+        if ((fContentX < 0.0f) || (fContentY < 0.0f) || (fContentX >= (m_metricsFont.fCellWidth * static_cast<FLOAT>(m_iCols))) ||
+            (fContentY >= (m_metricsFont.fCellHeight * static_cast<FLOAT>(m_iRows))))
+        {
+            return FALSE;
+        }
+
+        iCol = ClampInt(static_cast<INT>(std::floor(fContentX / m_metricsFont.fCellWidth)), 0, m_iCols - 1);
+        iRow = ClampInt(static_cast<INT>(std::floor(fContentY / m_metricsFont.fCellHeight)), 0, m_iRows - 1);
+        if (lpiCol)
+        {
+            *lpiCol = iCol;
+        }
+        if (lpiRow)
+        {
+            *lpiRow = iRow;
+        }
+        return TRUE;
     }
 
     BOOL Renderer::HandleMouseMove(_In_ INT iX, _In_ INT iY) noexcept
@@ -201,6 +280,9 @@ namespace GuiTerminal::Internals
 
     BOOL Renderer::HitTestScrollBars(_In_ INT iX, _In_ INT iY, _Out_opt_ PBOOL lpbVertical, _Out_opt_ PBOOL lpbThumb) const noexcept
     {
+        FLOAT fPointerX;
+        FLOAT fPointerY;
+
         if (lpbVertical)
         {
             *lpbVertical = FALSE;
@@ -210,7 +292,12 @@ namespace GuiTerminal::Internals
             *lpbThumb = FALSE;
         }
 
-        if ((m_scrollBarVertical.bVisible != FALSE) && IsPointInRect(iX, iY, m_scrollBarVertical.rcTrack) != FALSE)
+        fPointerX = PixelsToDipsX(iX);
+        fPointerY = PixelsToDipsY(iY);
+
+        if ((m_scrollBarVertical.bVisible != FALSE) && (fPointerX >= m_scrollBarVertical.rcTrack.left) &&
+            (fPointerX < m_scrollBarVertical.rcTrack.right) && (fPointerY >= m_scrollBarVertical.rcTrack.top) &&
+            (fPointerY < m_scrollBarVertical.rcTrack.bottom))
         {
             if (lpbVertical)
             {
@@ -218,11 +305,14 @@ namespace GuiTerminal::Internals
             }
             if (lpbThumb)
             {
-                *lpbThumb = IsPointInRect(iX, iY, m_scrollBarVertical.rcThumb);
+                *lpbThumb = ((fPointerX >= m_scrollBarVertical.rcThumb.left) && (fPointerX < m_scrollBarVertical.rcThumb.right) &&
+                             (fPointerY >= m_scrollBarVertical.rcThumb.top) && (fPointerY < m_scrollBarVertical.rcThumb.bottom)) ? TRUE : FALSE;
             }
             return TRUE;
         }
-        if ((m_scrollBarHorizontal.bVisible != FALSE) && IsPointInRect(iX, iY, m_scrollBarHorizontal.rcTrack) != FALSE)
+        if ((m_scrollBarHorizontal.bVisible != FALSE) && (fPointerX >= m_scrollBarHorizontal.rcTrack.left) &&
+            (fPointerX < m_scrollBarHorizontal.rcTrack.right) && (fPointerY >= m_scrollBarHorizontal.rcTrack.top) &&
+            (fPointerY < m_scrollBarHorizontal.rcTrack.bottom))
         {
             if (lpbVertical)
             {
@@ -230,7 +320,8 @@ namespace GuiTerminal::Internals
             }
             if (lpbThumb)
             {
-                *lpbThumb = IsPointInRect(iX, iY, m_scrollBarHorizontal.rcThumb);
+                *lpbThumb = ((fPointerX >= m_scrollBarHorizontal.rcThumb.left) && (fPointerX < m_scrollBarHorizontal.rcThumb.right) &&
+                             (fPointerY >= m_scrollBarHorizontal.rcThumb.top) && (fPointerY < m_scrollBarHorizontal.rcThumb.bottom)) ? TRUE : FALSE;
             }
             return TRUE;
         }
@@ -239,17 +330,20 @@ namespace GuiTerminal::Internals
 
     BOOL Renderer::ScrollByTrackClick(_In_ BOOL bVertical, _In_ INT iPointerCoordinate) noexcept
     {
+        FLOAT fPointerCoordinate;
+
+        fPointerCoordinate = (bVertical != FALSE) ? PixelsToDipsY(iPointerCoordinate) : PixelsToDipsX(iPointerCoordinate);
         if (bVertical != FALSE)
         {
             if (m_scrollBarVertical.bVisible == FALSE)
             {
                 return FALSE;
             }
-            if (static_cast<FLOAT>(iPointerCoordinate) < m_scrollBarVertical.rcThumb.top)
+            if (fPointerCoordinate < m_scrollBarVertical.rcThumb.top)
             {
                 return ScrollByPage(TRUE, FALSE);
             }
-            if (static_cast<FLOAT>(iPointerCoordinate) >= m_scrollBarVertical.rcThumb.bottom)
+            if (fPointerCoordinate >= m_scrollBarVertical.rcThumb.bottom)
             {
                 return ScrollByPage(TRUE, TRUE);
             }
@@ -259,11 +353,11 @@ namespace GuiTerminal::Internals
         {
             return FALSE;
         }
-        if (static_cast<FLOAT>(iPointerCoordinate) < m_scrollBarHorizontal.rcThumb.left)
+        if (fPointerCoordinate < m_scrollBarHorizontal.rcThumb.left)
         {
             return ScrollByPage(FALSE, FALSE);
         }
-        if (static_cast<FLOAT>(iPointerCoordinate) >= m_scrollBarHorizontal.rcThumb.right)
+        if (fPointerCoordinate >= m_scrollBarHorizontal.rcThumb.right)
         {
             return ScrollByPage(FALSE, TRUE);
         }
@@ -338,16 +432,23 @@ namespace GuiTerminal::Internals
                                        _In_ INT iOffsetOrigin) noexcept
     {
         const ScrollBarMetrics& scrollBarMetrics = (bVertical != FALSE) ? m_scrollBarVertical : m_scrollBarHorizontal;
-        INT iPointerDelta;
+        FLOAT fPointerDelta;
         INT iOffsetCurrent;
 
         if ((scrollBarMetrics.bVisible == FALSE) || (scrollBarMetrics.fThumbTravel <= 0.0f) || (scrollBarMetrics.iMaxOffset <= 0))
         {
             return FALSE;
         }
-        iPointerDelta = iPointerCoordinate - iPointerOrigin;
+        if (bVertical != FALSE)
+        {
+            fPointerDelta = PixelsToDipsY(iPointerCoordinate) - PixelsToDipsY(iPointerOrigin);
+        }
+        else
+        {
+            fPointerDelta = PixelsToDipsX(iPointerCoordinate) - PixelsToDipsX(iPointerOrigin);
+        }
         iOffsetCurrent = iOffsetOrigin +
-                         static_cast<INT>(std::lround((static_cast<FLOAT>(iPointerDelta) / scrollBarMetrics.fThumbTravel) *
+                         static_cast<INT>(std::lround((fPointerDelta / scrollBarMetrics.fThumbTravel) *
                                                       static_cast<FLOAT>(scrollBarMetrics.iMaxOffset)));
         if (bVertical != FALSE)
         {
@@ -525,55 +626,79 @@ namespace GuiTerminal::Internals
         return S_OK;
     }
 
+    FLOAT Renderer::PixelsToDipsX(_In_ INT iPixels) const noexcept
+    {
+        return (static_cast<FLOAT>(iPixels) * 96.0f) / m_fDpiX;
+    }
+
+    FLOAT Renderer::PixelsToDipsY(_In_ INT iPixels) const noexcept
+    {
+        return (static_cast<FLOAT>(iPixels) * 96.0f) / m_fDpiY;
+    }
+
+    INT Renderer::DipsToPixelsX(_In_ FLOAT fDips) const noexcept
+    {
+        return static_cast<INT>(std::lround((fDips * m_fDpiX) / 96.0f));
+    }
+
+    INT Renderer::DipsToPixelsY(_In_ FLOAT fDips) const noexcept
+    {
+        return static_cast<INT>(std::lround((fDips * m_fDpiY) / 96.0f));
+    }
+
     VOID Renderer::UpdateViewportLayout() noexcept
     {
-        INT iContentWidth;
-        INT iContentHeight;
-        INT iViewportWidth;
-        INT iViewportHeight;
+        FLOAT fContentWidth;
+        FLOAT fContentHeight;
+        FLOAT fViewportWidth;
+        FLOAT fViewportHeight;
+        FLOAT fScrollBarThicknessX;
+        FLOAT fScrollBarThicknessY;
         BOOL bVisibleHorizontal;
         BOOL bVisibleVertical;
         BOOL bVisibleHorizontalOld;
         BOOL bVisibleVerticalOld;
 
-        iContentWidth = static_cast<INT>(std::lround(m_metricsFont.fCellWidth * static_cast<FLOAT>(m_iCols)));
-        iContentHeight = static_cast<INT>(std::lround(m_metricsFont.fCellHeight * static_cast<FLOAT>(m_iRows)));
+        fContentWidth = m_metricsFont.fCellWidth * static_cast<FLOAT>(m_iCols);
+        fContentHeight = m_metricsFont.fCellHeight * static_cast<FLOAT>(m_iRows);
+        fScrollBarThicknessX = PixelsToDipsX(m_iScrollBarThickness);
+        fScrollBarThicknessY = PixelsToDipsY(m_iScrollBarThickness);
         bVisibleHorizontal = FALSE;
         bVisibleVertical = FALSE;
         do
         {
             bVisibleHorizontalOld = bVisibleHorizontal;
             bVisibleVerticalOld = bVisibleVertical;
-            iViewportWidth = m_iClientWidth - ((bVisibleVertical != FALSE) ? m_iScrollBarThickness : 0);
-            iViewportHeight = m_iClientHeight - ((bVisibleHorizontal != FALSE) ? m_iScrollBarThickness : 0);
-            if (iViewportWidth < 0)
+            fViewportWidth = PixelsToDipsX(m_iClientWidth) - ((bVisibleVertical != FALSE) ? fScrollBarThicknessX : 0.0f);
+            fViewportHeight = PixelsToDipsY(m_iClientHeight) - ((bVisibleHorizontal != FALSE) ? fScrollBarThicknessY : 0.0f);
+            if (fViewportWidth < 0.0f)
             {
-                iViewportWidth = 0;
+                fViewportWidth = 0.0f;
             }
-            if (iViewportHeight < 0)
+            if (fViewportHeight < 0.0f)
             {
-                iViewportHeight = 0;
+                fViewportHeight = 0.0f;
             }
-            bVisibleHorizontal = (iContentWidth > iViewportWidth) ? TRUE : FALSE;
-            bVisibleVertical = (iContentHeight > iViewportHeight) ? TRUE : FALSE;
+            bVisibleHorizontal = (fContentWidth > fViewportWidth) ? TRUE : FALSE;
+            bVisibleVertical = (fContentHeight > fViewportHeight) ? TRUE : FALSE;
         }
         while (bVisibleHorizontalOld != bVisibleHorizontal || bVisibleVerticalOld != bVisibleVertical);
 
-        iViewportWidth = m_iClientWidth - ((bVisibleVertical != FALSE) ? m_iScrollBarThickness : 0);
-        iViewportHeight = m_iClientHeight - ((bVisibleHorizontal != FALSE) ? m_iScrollBarThickness : 0);
-        if (iViewportWidth < 0)
+        fViewportWidth = PixelsToDipsX(m_iClientWidth) - ((bVisibleVertical != FALSE) ? fScrollBarThicknessX : 0.0f);
+        fViewportHeight = PixelsToDipsY(m_iClientHeight) - ((bVisibleHorizontal != FALSE) ? fScrollBarThicknessY : 0.0f);
+        if (fViewportWidth < 0.0f)
         {
-            iViewportWidth = 0;
+            fViewportWidth = 0.0f;
         }
-        if (iViewportHeight < 0)
+        if (fViewportHeight < 0.0f)
         {
-            iViewportHeight = 0;
+            fViewportHeight = 0.0f;
         }
 
         m_rcViewport.left = 0.0f;
         m_rcViewport.top = 0.0f;
-        m_rcViewport.right = static_cast<FLOAT>(iViewportWidth);
-        m_rcViewport.bottom = static_cast<FLOAT>(iViewportHeight);
+        m_rcViewport.right = fViewportWidth;
+        m_rcViewport.bottom = fViewportHeight;
 
         m_scrollBarHorizontal.bVisible = bVisibleHorizontal;
         m_scrollBarVertical.bVisible = bVisibleVertical;
@@ -593,10 +718,10 @@ namespace GuiTerminal::Internals
         UpdateScrollBarMetrics(m_scrollBarHorizontal, FALSE);
         UpdateScrollBarMetrics(m_scrollBarVertical, TRUE);
         m_fGridOffsetX = m_rcViewport.left + (std::max)(0.0f, ((m_rcViewport.right - m_rcViewport.left) -
-                                                               static_cast<FLOAT>(iContentWidth)) * 0.5f) -
+                                                               fContentWidth) * 0.5f) -
                          static_cast<FLOAT>(m_iScrollOffsetX);
         m_fGridOffsetY = m_rcViewport.top + (std::max)(0.0f, ((m_rcViewport.bottom - m_rcViewport.top) -
-                                                              static_cast<FLOAT>(iContentHeight)) * 0.5f) -
+                                                              fContentHeight) * 0.5f) -
                          static_cast<FLOAT>(m_iScrollOffsetY);
     }
 
@@ -606,14 +731,15 @@ namespace GuiTerminal::Internals
         FLOAT fThumbLength;
         FLOAT fThumbPosition;
         FLOAT fInset;
+        FLOAT fThickness;
 
         scrollBarMetrics.fThumbTravel = 0.0f;
         scrollBarMetrics.rcTrack = D2D1::RectF(0.0f, 0.0f, 0.0f, 0.0f);
         scrollBarMetrics.rcThumb = D2D1::RectF(0.0f, 0.0f, 0.0f, 0.0f);
         if (bVertical != FALSE)
         {
-            scrollBarMetrics.iViewportSize = static_cast<INT>(std::lround(m_rcViewport.bottom - m_rcViewport.top));
-            scrollBarMetrics.iContentSize = static_cast<INT>(std::lround(m_metricsFont.fCellHeight * static_cast<FLOAT>(m_iRows)));
+            scrollBarMetrics.iViewportSize = static_cast<INT>(std::floor(m_rcViewport.bottom - m_rcViewport.top));
+            scrollBarMetrics.iContentSize = static_cast<INT>(std::ceil(m_metricsFont.fCellHeight * static_cast<FLOAT>(m_iRows)));
             scrollBarMetrics.iMaxOffset = (std::max)(scrollBarMetrics.iContentSize - scrollBarMetrics.iViewportSize, 0);
             m_iScrollOffsetY = ClampInt(m_iScrollOffsetY, 0, scrollBarMetrics.iMaxOffset);
             scrollBarMetrics.iOffset = m_iScrollOffsetY;
@@ -621,12 +747,13 @@ namespace GuiTerminal::Internals
             {
                 return;
             }
-            scrollBarMetrics.rcTrack = D2D1::RectF(m_rcViewport.right, 0.0f, m_rcViewport.right + static_cast<FLOAT>(m_iScrollBarThickness), m_rcViewport.bottom);
+            scrollBarMetrics.rcTrack = D2D1::RectF(m_rcViewport.right, 0.0f,
+                                                   m_rcViewport.right + PixelsToDipsX(m_iScrollBarThickness), m_rcViewport.bottom);
         }
         else
         {
-            scrollBarMetrics.iViewportSize = static_cast<INT>(std::lround(m_rcViewport.right - m_rcViewport.left));
-            scrollBarMetrics.iContentSize = static_cast<INT>(std::lround(m_metricsFont.fCellWidth * static_cast<FLOAT>(m_iCols)));
+            scrollBarMetrics.iViewportSize = static_cast<INT>(std::floor(m_rcViewport.right - m_rcViewport.left));
+            scrollBarMetrics.iContentSize = static_cast<INT>(std::ceil(m_metricsFont.fCellWidth * static_cast<FLOAT>(m_iCols)));
             scrollBarMetrics.iMaxOffset = (std::max)(scrollBarMetrics.iContentSize - scrollBarMetrics.iViewportSize, 0);
             m_iScrollOffsetX = ClampInt(m_iScrollOffsetX, 0, scrollBarMetrics.iMaxOffset);
             scrollBarMetrics.iOffset = m_iScrollOffsetX;
@@ -634,7 +761,8 @@ namespace GuiTerminal::Internals
             {
                 return;
             }
-            scrollBarMetrics.rcTrack = D2D1::RectF(0.0f, m_rcViewport.bottom, m_rcViewport.right, m_rcViewport.bottom + static_cast<FLOAT>(m_iScrollBarThickness));
+            scrollBarMetrics.rcTrack = D2D1::RectF(0.0f, m_rcViewport.bottom, m_rcViewport.right,
+                                                   m_rcViewport.bottom + PixelsToDipsY(m_iScrollBarThickness));
         }
 
         fTrackLength = (bVertical != FALSE) ? (scrollBarMetrics.rcTrack.bottom - scrollBarMetrics.rcTrack.top) :
@@ -643,9 +771,10 @@ namespace GuiTerminal::Internals
         {
             return;
         }
+        fThickness = (bVertical != FALSE) ? PixelsToDipsX(m_iScrollBarThickness) : PixelsToDipsY(m_iScrollBarThickness);
         fThumbLength = (std::max)((fTrackLength * static_cast<FLOAT>(scrollBarMetrics.iViewportSize)) /
                                   static_cast<FLOAT>(scrollBarMetrics.iContentSize),
-                                  static_cast<FLOAT>((std::max)(m_iScrollBarThickness * 2, 24)));
+                                  (std::max)(fThickness * 2.0f, 24.0f));
         if (fThumbLength > fTrackLength)
         {
             fThumbLength = fTrackLength;
@@ -655,7 +784,7 @@ namespace GuiTerminal::Internals
                          (scrollBarMetrics.fThumbTravel * static_cast<FLOAT>(scrollBarMetrics.iOffset)) /
                              static_cast<FLOAT>(scrollBarMetrics.iMaxOffset) :
                          0.0f;
-        fInset = (std::max)(static_cast<FLOAT>(m_iScrollBarThickness) * 0.2f, 2.0f);
+        fInset = (std::max)(fThickness * 0.2f, 2.0f);
         if (bVertical != FALSE)
         {
             scrollBarMetrics.rcThumb = D2D1::RectF(scrollBarMetrics.rcTrack.left + fInset,
@@ -711,8 +840,8 @@ namespace GuiTerminal::Internals
 
         if ((m_scrollBarHorizontal.bVisible != FALSE) && (m_scrollBarVertical.bVisible != FALSE))
         {
-            rcCorner = D2D1::RectF(m_rcViewport.right, m_rcViewport.bottom, static_cast<FLOAT>(m_iClientWidth),
-                                   static_cast<FLOAT>(m_iClientHeight));
+            rcCorner = D2D1::RectF(m_rcViewport.right, m_rcViewport.bottom, PixelsToDipsX(m_iClientWidth),
+                                   PixelsToDipsY(m_iClientHeight));
             m_brush->SetColor(colorTrack);
             m_renderTarget->FillRectangle(rcCorner, m_brush.Get());
         }

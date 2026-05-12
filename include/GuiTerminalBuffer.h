@@ -108,6 +108,10 @@ namespace GuiTerminal
             HRESULT RelocateRegion(_In_ RegionHandle hRegion, _In_ INT iX, _In_ INT iY, _In_ INT iWidth, _In_ INT iHeight) noexcept;
             VOID GetRegionLocation(_In_ RegionHandle hRegion, _Out_opt_ LPINT lpiX, _Out_opt_ LPINT lpiY, _Out_opt_ LPINT lpiWidth,
                                    _Out_opt_ LPINT lpiHeight) const noexcept;
+            BOOL ConvertToRegionCoordinates(_In_opt_ RegionHandle hRegion, _In_ INT iColTerminal, _In_ INT iRowTerminal,
+                                            _Out_opt_ LPINT lpiColRegion, _Out_opt_ LPINT lpiRowRegion) const noexcept;
+            BOOL ConvertFromRegionCoordinates(_In_opt_ RegionHandle hRegion, _In_ INT iColRegion, _In_ INT iRowRegion,
+                                              _Out_opt_ LPINT lpiColTerminal, _Out_opt_ LPINT lpiRowTerminal) const noexcept;
 
             VOID SaveCursor(_In_opt_ RegionHandle hRegion) noexcept;
             VOID RestoreCursor(_In_opt_ RegionHandle hRegion) noexcept;
@@ -120,6 +124,7 @@ namespace GuiTerminal
         private:
             HRESULT InitializeCells() noexcept;
             HRESULT ValidateRegionBounds(_In_ INT iX, _In_ INT iY, _In_ INT iWidth, _In_ INT iHeight) const noexcept;
+            const Region_s* ResolveRegion(_In_opt_ RegionHandle hRegion) const noexcept;
 
             VOID SetCell(_In_ INT iX, _In_ INT iY, _In_ WCHAR chCodepointW, _In_ const Attributes& sAttributesCell) noexcept;
             VOID FillCell(_In_ INT iX, _In_ INT iY, _In_ const Attributes& sAttributesCell) noexcept;

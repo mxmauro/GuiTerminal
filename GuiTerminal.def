@@ -3,6 +3,7 @@ EXPORTS
     GuiTerminalControl_Create
     GuiTerminalControl_WndProc
     GuiTerminalControl_GetFromWindow
+    GuiTerminalControl_SetMouseClickCallback
     GuiTerminalControl_Clear
     GuiTerminalControl_Scroll
     GuiTerminalControl_FillArea
@@ -19,5 +20,9 @@ EXPORTS
     GuiTerminalControl_PrintRegionV
     GuiTerminalControl_ResizeTerminal
     GuiTerminalControl_GetCellSize
+    GuiTerminalControl_GetCellPosition
+    GuiTerminalControl_GetCellFromPosition
     GuiTerminalControl_GetPreferredClientSize
     GuiTerminalControl_GetPreferredWindowSize
+    GuiTerminalControl_ConvertToRegionCoordinates
+    GuiTerminalControl_ConvertFromRegionCoordinates

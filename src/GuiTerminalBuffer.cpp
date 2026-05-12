@@ -628,6 +628,77 @@ namespace GuiTerminal::Internals
         }
     }
 
+    BOOL Buffer::ConvertToRegionCoordinates(_In_opt_ RegionHandle hRegion, _In_ INT iColTerminal, _In_ INT iRowTerminal,
+                                            _Out_opt_ LPINT lpiColRegion, _Out_opt_ LPINT lpiRowRegion) const noexcept
+    {
+        const Region_s* lpsRegionCurrent;
+
+        if (lpiColRegion)
+        {
+            *lpiColRegion = 0;
+        }
+        if (lpiRowRegion)
+        {
+            *lpiRowRegion = 0;
+        }
+
+        lpsRegionCurrent = ResolveRegion(hRegion);
+        if (!lpsRegionCurrent)
+        {
+            return FALSE;
+        }
+        if ((iColTerminal < lpsRegionCurrent->iX) || (iColTerminal >= lpsRegionCurrent->iX + lpsRegionCurrent->iWidth) ||
+            (iRowTerminal < lpsRegionCurrent->iY) || (iRowTerminal >= lpsRegionCurrent->iY + lpsRegionCurrent->iHeight))
+        {
+            return FALSE;
+        }
+
+        if (lpiColRegion)
+        {
+            *lpiColRegion = iColTerminal - lpsRegionCurrent->iX;
+        }
+        if (lpiRowRegion)
+        {
+            *lpiRowRegion = iRowTerminal - lpsRegionCurrent->iY;
+        }
+        return TRUE;
+    }
+
+    BOOL Buffer::ConvertFromRegionCoordinates(_In_opt_ RegionHandle hRegion, _In_ INT iColRegion, _In_ INT iRowRegion,
+                                              _Out_opt_ LPINT lpiColTerminal, _Out_opt_ LPINT lpiRowTerminal) const noexcept
+    {
+        const Region_s* lpsRegionCurrent;
+
+        if (lpiColTerminal)
+        {
+            *lpiColTerminal = 0;
+        }
+        if (lpiRowTerminal)
+        {
+            *lpiRowTerminal = 0;
+        }
+
+        lpsRegionCurrent = ResolveRegion(hRegion);
+        if (!lpsRegionCurrent)
+        {
+            return FALSE;
+        }
+        if ((iColRegion < 0) || (iColRegion >= lpsRegionCurrent->iWidth) || (iRowRegion < 0) || (iRowRegion >= lpsRegionCurrent->iHeight))
+        {
+            return FALSE;
+        }
+
+        if (lpiColTerminal)
+        {
+            *lpiColTerminal = lpsRegionCurrent->iX + iColRegion;
+        }
+        if (lpiRowTerminal)
+        {
+            *lpiRowTerminal = lpsRegionCurrent->iY + iRowRegion;
+        }
+        return TRUE;
+    }
+
     VOID Buffer::SaveCursor(_In_opt_ RegionHandle hRegion) noexcept
     {
         if (!hRegion)
@@ -720,6 +791,23 @@ namespace GuiTerminal::Internals
             return E_INVALIDARG;
         }
         return S_OK;
+    }
+
+    const Region_s* Buffer::ResolveRegion(_In_opt_ RegionHandle hRegion) const noexcept
+    {
+        if (!hRegion)
+        {
+            return &m_mapRegions.find(0)->second;
+        }
+
+        for (const auto& pairRegion : m_mapRegions)
+        {
+            if (&pairRegion.second == hRegion)
+            {
+                return &pairRegion.second;
+            }
+        }
+        return nullptr;
     }
 
     VOID Buffer::SetCell(_In_ INT iX, _In_ INT iY, _In_ WCHAR chCodepointW, _In_ const Attributes& attributesCell) noexcept

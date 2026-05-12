@@ -57,7 +57,7 @@
 - Internal project includes in `.cpp` files currently use quoted relative Windows paths such as `"..\\include\\GuiTerminalBuffer.h"`. Match the surrounding file instead of restyling include paths.
 - File-local helper declarations should stay `static` and appear near the top of the translation unit before the main namespace or function bodies.
 - Prefer explicit types over `auto`.
-- Exception: `auto` is acceptable for iterator-style loops and similar cases where the deduced type is obvious and the alternative is noisier, matching the existing `for (const auto& ...)` pattern in the codebase.
+- Exception: `auto` is acceptable for iterator-style loops, `if`/`switch` init-statements, and similar cases where the deduced type is obvious and the alternative is noisier, matching existing patterns such as `for (const auto& ...)` and `if (auto it = ...; ...)`.
 - Initialize variables explicitly, often at declaration time or immediately before first use:
 
 ```cpp

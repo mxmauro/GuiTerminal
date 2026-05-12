@@ -22,6 +22,26 @@ namespace GuiTerminal
             COLORREF crDefaultBackground{ RGB(12U, 12U, 12U) };
         };
 
+        enum MouseClickEvent : DWORD
+        {
+            MouseClickEventLeftDown = 0U,
+            MouseClickEventLeftUp = 1U,
+            MouseClickEventRightDown = 2U,
+            MouseClickEventRightUp = 3U,
+            MouseClickEventMiddleDown = 4U,
+            MouseClickEventMiddleUp = 5U
+        };
+
+        enum MouseKeyFlags : DWORD
+        {
+            MouseKeyFlagNone = 0U,
+            MouseKeyFlagControl = 1U << 0,
+            MouseKeyFlagAlt = 1U << 1
+        };
+
+        typedef VOID (CALLBACK *MouseClickCallback)(_In_ Control* lpControl, _In_ MouseClickEvent eEvent, _In_ DWORD dwKeyFlags,
+                                                    _In_ INT iCol, _In_ INT iRow, _In_ INT iX, _In_ INT iY, _In_opt_ LPVOID lpContext);
+
         enum StyleFlags : DWORD
         {
             StyleNone = 0U,
@@ -98,17 +118,34 @@ namespace GuiTerminal
         VOID GetRegionLocation(_In_opt_ RegionHandle hRegion, _Out_opt_ LPINT lpiX, _Out_opt_ LPINT lpiY, _Out_opt_ LPINT lpiWidth,
                                _Out_opt_ LPINT lpiHeight) const noexcept;
 
+        // Convert zero-based terminal coordinates to zero-based region coordinates.
+        BOOL ConvertToRegionCoordinates(_In_opt_ RegionHandle hRegion, _In_ INT iColTerminal, _In_ INT iRowTerminal,
+                                        _Out_opt_ LPINT lpiColRegion, _Out_opt_ LPINT lpiRowRegion) const noexcept;
+
+        // Convert zero-based region coordinates to zero-based terminal coordinates.
+        BOOL ConvertFromRegionCoordinates(_In_opt_ RegionHandle hRegion, _In_ INT iColRegion, _In_ INT iRowRegion,
+                                          _Out_opt_ LPINT lpiColTerminal, _Out_opt_ LPINT lpiRowTerminal) const noexcept;
+
         // Resize the logical terminal grid.
         HRESULT ResizeTerminal(_In_ INT iCols, _In_ INT iRows) noexcept;
 
         // Return the size of a single cell in pixels.
         HRESULT GetCellSize(_Out_ LPSIZE lpSize) const noexcept;
 
+        // Return the client-space rectangle for a zero-based cell, in pixels.
+        BOOL GetCellPosition(_In_ INT iCol, _In_ INT iRow, _Out_ LPRECT lprcCell) const noexcept;
+
+        // Convert a client-space pixel position to a zero-based cell coordinate.
+        BOOL GetCellFromPosition(_In_ INT iX, _In_ INT iY, _Out_opt_ LPINT lpiCol, _Out_opt_ LPINT lpiRow) const noexcept;
+
         // Return the preferred client size for the current terminal grid.
         HRESULT GetPreferredClientSize(_Out_ LPSIZE lpSize) const noexcept;
 
         // Return the preferred window size for the current terminal grid.
         HRESULT GetPreferredWindowSize(_Out_ LPSIZE lpSize) const noexcept;
+
+        // Register a callback for mouse button events on terminal cells.
+        VOID SetMouseClickCallback(_In_opt_ MouseClickCallback fnMouseClickCallback, _In_opt_ LPVOID lpContext) noexcept;
 
     private:
         enum ScrollBarPart
@@ -130,10 +167,13 @@ namespace GuiTerminal
         // Update pixel-based scrolling and scroll bar visibility after size/content changes.
         VOID UpdateScrollBars() noexcept;
 
+        // Translate the client coordinates to a terminal cell and dispatch the callback.
+        BOOL InvokeMouseClickCallback(_In_ MouseClickEvent eEvent, _In_ DWORD dwKeyFlags, _In_ INT iX, _In_ INT iY) noexcept;
+
         // Update drag/hover state for custom scroll bars.
         BOOL HandleMouseMove(_In_ INT iX, _In_ INT iY) noexcept;
         BOOL HandleMouseLeave() noexcept;
-        BOOL HandleLeftButtonDown(_In_ INT iX, _In_ INT iY) noexcept;
+        BOOL HandleLeftButtonDown(_In_ INT iX, _In_ INT iY, _Out_opt_ PBOOL lpbBeginCapture) noexcept;
         BOOL HandleLeftButtonUp() noexcept;
         BOOL HandleMouseWheel(_In_ SHORT iDelta) noexcept;
 
@@ -156,6 +196,8 @@ namespace GuiTerminal
         INT m_iScrollDragOriginY{};
         INT m_iScrollOffsetOriginX{};
         INT m_iScrollOffsetOriginY{};
+        MouseClickCallback m_fnMouseClickCallback{};
+        LPVOID m_lpMouseClickCallbackContext{};
         Internals::Buffer m_sBuffer;
         Internals::Renderer m_sRenderer;
     };

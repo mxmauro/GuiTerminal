@@ -26,11 +26,13 @@ namespace GuiTerminal
             HRESULT Initialize(_In_ HWND hWnd, _In_z_ LPCWSTR szFontFamilyW, _In_ FLOAT fFontSize) noexcept;
             HRESULT Resize(_In_ UINT uiWidth, _In_ UINT uiHeight) noexcept;
             HRESULT Render(_In_ const Buffer& bufferGuiTerminal) noexcept;
+            BOOL GetCellPosition(_In_ INT iCol, _In_ INT iRow, _Out_ LPRECT lprcCell) const noexcept;
             HRESULT GetCellSize(_Out_ LPSIZE lpSize) const noexcept;
             HRESULT GetPreferredClientSize(_In_ INT iCols, _In_ INT iRows, _Out_ LPSIZE lpSize) const noexcept;
             VOID SetContentSize(_In_ INT iCols, _In_ INT iRows) noexcept;
             VOID UpdateScrollBars() noexcept;
             BOOL HasVisibleScrollBars() const noexcept;
+            BOOL HitTestCell(_In_ INT iX, _In_ INT iY, _Out_opt_ LPINT lpiCol, _Out_opt_ LPINT lpiRow) const noexcept;
             BOOL HandleMouseMove(_In_ INT iX, _In_ INT iY) noexcept;
             BOOL HandleMouseLeave() noexcept;
             BOOL HitTestScrollBars(_In_ INT iX, _In_ INT iY, _Out_opt_ PBOOL lpbVertical, _Out_opt_ PBOOL lpbThumb) const noexcept;
@@ -73,6 +75,10 @@ namespace GuiTerminal
             HRESULT CreateDeviceIndependentResources() noexcept;
             HRESULT CreateDeviceResources() noexcept;
             HRESULT CreateTextFormatAndMetrics() noexcept;
+            FLOAT PixelsToDipsX(_In_ INT iPixels) const noexcept;
+            FLOAT PixelsToDipsY(_In_ INT iPixels) const noexcept;
+            INT DipsToPixelsX(_In_ FLOAT fDips) const noexcept;
+            INT DipsToPixelsY(_In_ FLOAT fDips) const noexcept;
             VOID UpdateViewportLayout() noexcept;
             VOID UpdateScrollBarMetrics(_Inout_ ScrollBarMetrics& scrollBarMetrics, _In_ BOOL bVertical) noexcept;
             VOID DrawScrollBars(_In_ COLORREF crDefaultBackground) noexcept;

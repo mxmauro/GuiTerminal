@@ -16,6 +16,8 @@ GuiTerminal gives you a reusable control that:
 - Renders the terminal contents with Direct2D and DirectWrite.
 - Supports writing to the full terminal or to sub-regions inside the terminal.
 - Supports scrolling and region-based updates.
+- Supports mouse button callbacks with cell coordinates and modifier flags.
+- Supports converting between terminal, region, and client-space cell coordinates.
 
 ## Configure and build with CMake
 
@@ -136,6 +138,14 @@ The existing Visual Studio projects are still present for local development. The
 - `Release`
 
 Both use the static CRT and write outputs to the existing `lib/<platform>/<configuration>` and `bin/<project>/<platform>/<configuration>` folders.
+
+## API Notes
+
+Recent public API additions include:
+
+- Mouse click events for left, right, and middle buttons, with down/up state and `CTRL` / `ALT` modifiers.
+- Region coordinate conversion helpers to map zero-based terminal coordinates to and from zero-based sub-region coordinates.
+- Cell geometry helpers to map zero-based cells to client-space pixel rectangles, and client-space pixel positions back to zero-based cells.
 
 ## LICENSE
 

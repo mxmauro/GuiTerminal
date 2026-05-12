@@ -14,6 +14,11 @@
 
 // -----------------------------------------------------------------------------
 
+typedef struct DemoMouseCallbackContext
+{
+    GuiTerminal::RegionHandle hRegionStatus;
+} DemoMouseCallbackContext;
+
 static HRESULT EnablePerMonitorDpiAwareness() noexcept;
 
 static HRESULT CreateMainWindow(_In_ HINSTANCE hInstance, _In_ INT nCmdShow, _In_z_ LPCWSTR szWindowClassW,
@@ -25,8 +30,14 @@ static LRESULT HandleCreate(_In_ HWND hWnd) noexcept;
 static HRESULT ResizeWindowToPreferredClientArea(_In_ HWND hWnd, _In_ GuiTerminal::Control* lpGuiTerminal) noexcept;
 
 static HRESULT RunDemo(_In_ GuiTerminal::Control* lpGuiTerminal) noexcept;
+static VOID CALLBACK DemoMouseClickCallback(_In_ GuiTerminal::Control* lpGuiTerminal, _In_ GuiTerminal::Control::MouseClickEvent eEvent,
+                                            _In_ DWORD dwKeyFlags, _In_ INT iCol, _In_ INT iRow, _In_ INT iX, _In_ INT iY,
+                                            _In_opt_ LPVOID lpContext) noexcept;
+static LPCWSTR DescribeMouseClickEvent(_In_ GuiTerminal::Control::MouseClickEvent eEvent) noexcept;
 
 // -----------------------------------------------------------------------------
+
+static DemoMouseCallbackContext g_sDemoMouseCallbackContext{};
 
 INT APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPWSTR lpCmdLineW, _In_ INT nCmdShow)
 {
@@ -201,12 +212,14 @@ static HRESULT ResizeWindowToPreferredClientArea(_In_ HWND hWnd, _In_ GuiTermina
 
 static HRESULT RunDemo(_In_ GuiTerminal::Control* lpGuiTerminal) noexcept
 {
+    GuiTerminal::RegionHandle hRegionStatus;
     GuiTerminal::RegionHandle hRegionLeft;
     GuiTerminal::RegionHandle hRegionRight;
     WCHAR szBufferW[256];
     INT iIndex;
     HRESULT hr;
 
+    hRegionStatus = nullptr;
     lpGuiTerminal->Clear();
 
     lpGuiTerminal->Write(L"\x1b[1;97mWin32 + Direct2D/DirectWrite terminal demo\x1b[0m\r\n"
@@ -220,8 +233,18 @@ static HRESULT RunDemo(_In_ GuiTerminal::Control* lpGuiTerminal) noexcept
                          L"\x1b[34mBlue\x1b[0m "
                          L"\x1b[91mBright red\x1b[0m "
                          L"\x1b[38;5;141m256-color\x1b[0m\r\n"
-                         L"\x1b[s\x1b[6;5HPositioned at row 6 col 5\x1b[u"
+                         L"\x1b[s\x1b[6;5HPositioned at row 6 col 5\x1b[u\r\n"
                          L"\x1b[8;1H\x1b[2KTwo independent scrolling regions below:");
+
+    hr = lpGuiTerminal->CreateRegion(0, 8, TERMINAL_COLS, 2, &hRegionStatus);
+    if (FAILED(hr))
+    {
+        return hr;
+    }
+    g_sDemoMouseCallbackContext.hRegionStatus = hRegionStatus;
+    lpGuiTerminal->SetMouseClickCallback(DemoMouseClickCallback, &g_sDemoMouseCallbackContext);
+    lpGuiTerminal->WriteRegion(hRegionStatus, L"\x1b[100;97m Mouse events \x1b[0m\r\n"
+                                              L"Click inside the terminal grid with left, right or middle buttons.");
 
     hr = lpGuiTerminal->CreateRegion(0, 10, 39, 15, &hRegionLeft);
     if (FAILED(hr))
@@ -247,4 +270,47 @@ static HRESULT RunDemo(_In_ GuiTerminal::Control* lpGuiTerminal) noexcept
     }
 
     return S_OK;
+}
+
+static VOID CALLBACK DemoMouseClickCallback(_In_ GuiTerminal::Control* lpGuiTerminal, _In_ GuiTerminal::Control::MouseClickEvent eEvent,
+                                            _In_ DWORD dwKeyFlags, _In_ INT iCol, _In_ INT iRow, _In_ INT iX, _In_ INT iY,
+                                            _In_opt_ LPVOID lpContext) noexcept
+{
+    DemoMouseCallbackContext* lpDemoMouseCallbackContext;
+    WCHAR szBufferW[256];
+
+    lpDemoMouseCallbackContext = reinterpret_cast<DemoMouseCallbackContext*>(lpContext);
+    if ((!lpGuiTerminal) || (!lpDemoMouseCallbackContext) || (!lpDemoMouseCallbackContext->hRegionStatus))
+    {
+        return;
+    }
+
+    swprintf_s(szBufferW, sizeof(szBufferW) / sizeof(szBufferW[0]), L"%-10s col=%d row=%d px=(%d,%d) ctrl=%d alt=%d",
+               DescribeMouseClickEvent(eEvent), iCol, iRow, iX, iY,
+               ((dwKeyFlags & GuiTerminal::Control::MouseKeyFlagControl) != 0U) ? 1 : 0,
+               ((dwKeyFlags & GuiTerminal::Control::MouseKeyFlagAlt) != 0U) ? 1 : 0);
+
+    lpGuiTerminal->ClearRegion(lpDemoMouseCallbackContext->hRegionStatus);
+    lpGuiTerminal->WriteRegion(lpDemoMouseCallbackContext->hRegionStatus, L"\x1b[100;97m Mouse events \x1b[0m\r\n");
+    lpGuiTerminal->WriteRegion(lpDemoMouseCallbackContext->hRegionStatus, szBufferW);
+}
+
+static LPCWSTR DescribeMouseClickEvent(_In_ GuiTerminal::Control::MouseClickEvent eEvent) noexcept
+{
+    switch (eEvent)
+    {
+        case GuiTerminal::Control::MouseClickEventLeftDown:
+            return L"LeftDown";
+        case GuiTerminal::Control::MouseClickEventLeftUp:
+            return L"LeftUp";
+        case GuiTerminal::Control::MouseClickEventRightDown:
+            return L"RightDown";
+        case GuiTerminal::Control::MouseClickEventRightUp:
+            return L"RightUp";
+        case GuiTerminal::Control::MouseClickEventMiddleDown:
+            return L"MiddleDown";
+        case GuiTerminal::Control::MouseClickEventMiddleUp:
+            return L"MiddleUp";
+    }
+    return L"Unknown";
 }

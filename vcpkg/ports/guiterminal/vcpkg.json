@@ -1,6 +1,6 @@
 {
   "name": "guiterminal",
-  "version-string": "1.0.0",
+  "version-string": "1.1.0",
   "description": "Native C++ terminal control library for Win32 desktop applications rendered with Direct2D and DirectWrite.",
   "homepage": "https://github.com/mxmauro/GuiTerminal",
   "license": "MIT",

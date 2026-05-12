@@ -10,6 +10,7 @@
 // -----------------------------------------------------------------------------
 
 static HRESULT FormatWideStringV(_In_z_ LPCWSTR pszFormatW, _In_ va_list argList, _Out_ std::wstring& strTextW) noexcept;
+static DWORD GetMouseClickKeyFlags(_In_ WPARAM wParam) noexcept;
 
 // -----------------------------------------------------------------------------
 
@@ -144,14 +145,28 @@ namespace GuiTerminal
                 break;
 
             case WM_LBUTTONDOWN:
-                if (lpControl->HandleLeftButtonDown(GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)) != FALSE)
                 {
-                    if (lpControl->m_bDraggingScrollBar != FALSE)
+                    BOOL bBeginCapture;
+                    INT iX;
+                    INT iY;
+
+                    bBeginCapture = FALSE;
+                    iX = GET_X_LPARAM(lParam);
+                    iY = GET_Y_LPARAM(lParam);
+                    if (lpControl->HandleLeftButtonDown(iX, iY, &bBeginCapture) != FALSE)
                     {
-                        SetCapture(hWnd);
+                        if (bBeginCapture != FALSE)
+                        {
+                            SetCapture(hWnd);
+                        }
+                        InvalidateRect(hWnd, nullptr, FALSE);
+                        return TRUE;
                     }
-                    InvalidateRect(hWnd, nullptr, FALSE);
-                    return TRUE;
+                    if (lpControl->InvokeMouseClickCallback(MouseClickEventLeftDown, GetMouseClickKeyFlags(wParam), iX, iY) != FALSE)
+                    {
+                        InvalidateRect(hWnd, nullptr, FALSE);
+                        return TRUE;
+                    }
                 }
                 break;
 
@@ -162,6 +177,48 @@ namespace GuiTerminal
                     {
                         ReleaseCapture();
                     }
+                    InvalidateRect(hWnd, nullptr, FALSE);
+                    return TRUE;
+                }
+                if (lpControl->InvokeMouseClickCallback(MouseClickEventLeftUp, GetMouseClickKeyFlags(wParam), GET_X_LPARAM(lParam),
+                                                        GET_Y_LPARAM(lParam)) != FALSE)
+                {
+                    InvalidateRect(hWnd, nullptr, FALSE);
+                    return TRUE;
+                }
+                break;
+
+            case WM_RBUTTONDOWN:
+                if (lpControl->InvokeMouseClickCallback(MouseClickEventRightDown, GetMouseClickKeyFlags(wParam), GET_X_LPARAM(lParam),
+                                                        GET_Y_LPARAM(lParam)) != FALSE)
+                {
+                    InvalidateRect(hWnd, nullptr, FALSE);
+                    return TRUE;
+                }
+                break;
+
+            case WM_RBUTTONUP:
+                if (lpControl->InvokeMouseClickCallback(MouseClickEventRightUp, GetMouseClickKeyFlags(wParam), GET_X_LPARAM(lParam),
+                                                        GET_Y_LPARAM(lParam)) != FALSE)
+                {
+                    InvalidateRect(hWnd, nullptr, FALSE);
+                    return TRUE;
+                }
+                break;
+
+            case WM_MBUTTONDOWN:
+                if (lpControl->InvokeMouseClickCallback(MouseClickEventMiddleDown, GetMouseClickKeyFlags(wParam), GET_X_LPARAM(lParam),
+                                                        GET_Y_LPARAM(lParam)) != FALSE)
+                {
+                    InvalidateRect(hWnd, nullptr, FALSE);
+                    return TRUE;
+                }
+                break;
+
+            case WM_MBUTTONUP:
+                if (lpControl->InvokeMouseClickCallback(MouseClickEventMiddleUp, GetMouseClickKeyFlags(wParam), GET_X_LPARAM(lParam),
+                                                        GET_Y_LPARAM(lParam)) != FALSE)
+                {
                     InvalidateRect(hWnd, nullptr, FALSE);
                     return TRUE;
                 }
@@ -413,6 +470,22 @@ namespace GuiTerminal
         }
     }
 
+    BOOL Control::ConvertToRegionCoordinates(_In_opt_ RegionHandle hRegion, _In_ INT iColTerminal, _In_ INT iRowTerminal,
+                                             _Out_opt_ LPINT lpiColRegion, _Out_opt_ LPINT lpiRowRegion) const noexcept
+    {
+        std::lock_guard<std::mutex> lockGuard(m_mutex);
+
+        return m_sBuffer.ConvertToRegionCoordinates(hRegion, iColTerminal, iRowTerminal, lpiColRegion, lpiRowRegion);
+    }
+
+    BOOL Control::ConvertFromRegionCoordinates(_In_opt_ RegionHandle hRegion, _In_ INT iColRegion, _In_ INT iRowRegion,
+                                               _Out_opt_ LPINT lpiColTerminal, _Out_opt_ LPINT lpiRowTerminal) const noexcept
+    {
+        std::lock_guard<std::mutex> lockGuard(m_mutex);
+
+        return m_sBuffer.ConvertFromRegionCoordinates(hRegion, iColRegion, iRowRegion, lpiColTerminal, lpiRowTerminal);
+    }
+
     HRESULT Control::ResizeTerminal(_In_ INT iCols, _In_ INT iRows) noexcept
     {
         std::lock_guard<std::mutex> lockGuard(m_mutex);
@@ -440,6 +513,20 @@ namespace GuiTerminal
         std::lock_guard<std::mutex> lockGuard(m_mutex);
 
         return m_sRenderer.GetCellSize(lpSize);
+    }
+
+    BOOL Control::GetCellPosition(_In_ INT iCol, _In_ INT iRow, _Out_ LPRECT lprcCell) const noexcept
+    {
+        std::lock_guard<std::mutex> lockGuard(m_mutex);
+
+        return m_sRenderer.GetCellPosition(iCol, iRow, lprcCell);
+    }
+
+    BOOL Control::GetCellFromPosition(_In_ INT iX, _In_ INT iY, _Out_opt_ LPINT lpiCol, _Out_opt_ LPINT lpiRow) const noexcept
+    {
+        std::lock_guard<std::mutex> lockGuard(m_mutex);
+
+        return m_sRenderer.HitTestCell(iX, iY, lpiCol, lpiRow);
     }
 
     HRESULT Control::GetPreferredClientSize(_Out_ LPSIZE lpSize) const noexcept
@@ -475,13 +562,21 @@ namespace GuiTerminal
         rcWindow.bottom = sizeClient.cy;
         dwStyle = static_cast<DWORD>(GetWindowLongPtrW(m_hWnd, GWL_STYLE));
         dwExStyle = static_cast<DWORD>(GetWindowLongPtrW(m_hWnd, GWL_EXSTYLE));
-        if (AdjustWindowRectExForDpi(&rcWindow, dwStyle, TRUE, dwExStyle, GetDpiForWindow(m_hWnd)) == FALSE)
+        if (AdjustWindowRectExForDpi(&rcWindow, dwStyle, FALSE, dwExStyle, GetDpiForWindow(m_hWnd)) == FALSE)
         {
             return HRESULT_FROM_WIN32(GetLastError());
         }
         lpSize->cx = rcWindow.right - rcWindow.left;
         lpSize->cy = rcWindow.bottom - rcWindow.top;
         return S_OK;
+    }
+
+    VOID Control::SetMouseClickCallback(_In_opt_ MouseClickCallback fnMouseClickCallback, _In_opt_ LPVOID lpContext) noexcept
+    {
+        std::lock_guard<std::mutex> lockGuard(m_mutex);
+
+        m_fnMouseClickCallback = fnMouseClickCallback;
+        m_lpMouseClickCallbackContext = lpContext;
     }
 
     HRESULT Control::Initialize(_In_ HWND hWnd, _In_ const Config& configControl) noexcept
@@ -549,6 +644,30 @@ namespace GuiTerminal
         }
     }
 
+    BOOL Control::InvokeMouseClickCallback(_In_ MouseClickEvent eEvent, _In_ DWORD dwKeyFlags, _In_ INT iX, _In_ INT iY) noexcept
+    {
+        std::unique_lock<std::mutex> lockGuard(m_mutex);
+        INT iCol;
+        INT iRow;
+        MouseClickCallback fnMouseClickCallback;
+        LPVOID lpContext;
+
+        if (m_sRenderer.HitTestCell(iX, iY, &iCol, &iRow) == FALSE)
+        {
+            return FALSE;
+        }
+
+        fnMouseClickCallback = m_fnMouseClickCallback;
+        lpContext = m_lpMouseClickCallbackContext;
+        lockGuard.unlock();
+        if (fnMouseClickCallback)
+        {
+            fnMouseClickCallback(this, eEvent, dwKeyFlags, iCol, iRow, iX, iY, lpContext);
+            return TRUE;
+        }
+        return FALSE;
+    }
+
     BOOL Control::HandleMouseMove(_In_ INT iX, _In_ INT iY) noexcept
     {
         std::lock_guard<std::mutex> lockGuard(m_mutex);
@@ -596,11 +715,16 @@ namespace GuiTerminal
         return m_sRenderer.HandleMouseLeave();
     }
 
-    BOOL Control::HandleLeftButtonDown(_In_ INT iX, _In_ INT iY) noexcept
+    BOOL Control::HandleLeftButtonDown(_In_ INT iX, _In_ INT iY, _Out_opt_ PBOOL lpbBeginCapture) noexcept
     {
         std::lock_guard<std::mutex> lockGuard(m_mutex);
         BOOL bVertical;
         BOOL bThumb;
+
+        if (lpbBeginCapture)
+        {
+            *lpbBeginCapture = FALSE;
+        }
 
         if (m_sRenderer.HitTestScrollBars(iX, iY, &bVertical, &bThumb) == FALSE)
         {
@@ -614,6 +738,10 @@ namespace GuiTerminal
             m_iScrollDragOriginY = iY;
             m_iScrollOffsetOriginX = m_sRenderer.GetScrollOffsetX();
             m_iScrollOffsetOriginY = m_sRenderer.GetScrollOffsetY();
+            if (lpbBeginCapture)
+            {
+                *lpbBeginCapture = TRUE;
+            }
             return TRUE;
         }
         return m_sRenderer.ScrollByTrackClick(bVertical, (bVertical != FALSE) ? iY : iX);
@@ -687,4 +815,20 @@ static HRESULT FormatWideStringV(_In_z_ LPCWSTR pszFormatW, _In_ va_list argList
         return E_UNEXPECTED;
     }
     return S_OK;
+}
+
+static DWORD GetMouseClickKeyFlags(_In_ WPARAM wParam) noexcept
+{
+    DWORD dwKeyFlags;
+
+    dwKeyFlags = GuiTerminal::Control::MouseKeyFlagNone;
+    if ((wParam & MK_CONTROL) != 0U)
+    {
+        dwKeyFlags |= GuiTerminal::Control::MouseKeyFlagControl;
+    }
+    if ((GetKeyState(VK_MENU) & 0x8000) != 0)
+    {
+        dwKeyFlags |= GuiTerminal::Control::MouseKeyFlagAlt;
+    }
+    return dwKeyFlags;
 }

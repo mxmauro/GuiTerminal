@@ -40,6 +40,27 @@ typedef struct GuiTerminalControlConfig
 typedef struct GuiTerminalControl_s GuiTerminalControl;
 typedef struct GuiTerminalRegion_s* GuiTerminalRegion;
 
+enum GuiTerminalMouseClickEvent
+{
+    GuiTerminalMouseClickEventLeftDown = 0U,
+    GuiTerminalMouseClickEventLeftUp = 1U,
+    GuiTerminalMouseClickEventRightDown = 2U,
+    GuiTerminalMouseClickEventRightUp = 3U,
+    GuiTerminalMouseClickEventMiddleDown = 4U,
+    GuiTerminalMouseClickEventMiddleUp = 5U
+};
+
+enum GuiTerminalMouseKeyFlags
+{
+    GuiTerminalMouseKeyFlagNone = 0U,
+    GuiTerminalMouseKeyFlagControl = 1U << 0,
+    GuiTerminalMouseKeyFlagAlt = 1U << 1
+};
+
+typedef VOID (CALLBACK *GuiTerminalMouseClickCallback)(_In_ GuiTerminalControl* lpControl,
+                                                       _In_ enum GuiTerminalMouseClickEvent eEvent, _In_ DWORD dwKeyFlags, _In_ INT iCol,
+                                                       _In_ INT iRow, _In_ INT iX, _In_ INT iY, _In_opt_ LPVOID lpContext);
+
 // -----------------------------------------------------------------------------
 
 #ifdef __cplusplus
@@ -52,6 +73,9 @@ GUITERMINAL_CONTROL_API
 BOOL GuiTerminalControl_WndProc(_In_ HWND hWnd, _In_ UINT uMessage, _In_ WPARAM wParam, _In_ LPARAM lParam, _Out_ LRESULT* lplResult);
 GUITERMINAL_CONTROL_API
 GuiTerminalControl* GuiTerminalControl_GetFromWindow(_In_ HWND hWnd);
+GUITERMINAL_CONTROL_API
+VOID GuiTerminalControl_SetMouseClickCallback(_In_ GuiTerminalControl* lpControl, _In_opt_ GuiTerminalMouseClickCallback fnMouseClickCallback,
+                                              _In_opt_ LPVOID lpContext);
 
 GUITERMINAL_CONTROL_API
 VOID GuiTerminalControl_Clear(_In_ GuiTerminalControl* lpControl);
@@ -94,11 +118,24 @@ HRESULT GuiTerminalControl_RelocateRegion(_In_ GuiTerminalControl *lpControl, _I
 GUITERMINAL_CONTROL_API
 VOID GuiTerminalControl_GetRegionLocation(_In_ GuiTerminalControl *lpControl, _In_opt_  GuiTerminalRegion hRegion, _Out_opt_ LPINT lpiX,
                                           _Out_opt_ LPINT lpiY, _Out_opt_ LPINT lpiWidth, _Out_opt_ LPINT lpiHeight);
+GUITERMINAL_CONTROL_API
+BOOL GuiTerminalControl_ConvertToRegionCoordinates(_In_ GuiTerminalControl *lpControl, _In_opt_ GuiTerminalRegion hRegion,
+                                                   _In_ INT iColTerminal, _In_ INT iRowTerminal, _Out_opt_ LPINT lpiColRegion,
+                                                   _Out_opt_ LPINT lpiRowRegion);
+GUITERMINAL_CONTROL_API
+BOOL GuiTerminalControl_ConvertFromRegionCoordinates(_In_ GuiTerminalControl *lpControl, _In_opt_ GuiTerminalRegion hRegion,
+                                                     _In_ INT iColRegion, _In_ INT iRowRegion, _Out_opt_ LPINT lpiColTerminal,
+                                                     _Out_opt_ LPINT lpiRowTerminal);
 
 GUITERMINAL_CONTROL_API
 HRESULT GuiTerminalControl_ResizeTerminal(_In_ GuiTerminalControl* lpControl, _In_ INT iCols, _In_ INT iRows);
 GUITERMINAL_CONTROL_API
 HRESULT GuiTerminalControl_GetCellSize(_In_ const GuiTerminalControl* lpControl, _Out_ LPSIZE lpSize);
+GUITERMINAL_CONTROL_API
+BOOL GuiTerminalControl_GetCellPosition(_In_ const GuiTerminalControl* lpControl, _In_ INT iCol, _In_ INT iRow, _Out_ LPRECT lprcCell);
+GUITERMINAL_CONTROL_API
+BOOL GuiTerminalControl_GetCellFromPosition(_In_ const GuiTerminalControl* lpControl, _In_ INT iX, _In_ INT iY, _Out_opt_ LPINT lpiCol,
+                                            _Out_opt_ LPINT lpiRow);
 GUITERMINAL_CONTROL_API
 HRESULT GuiTerminalControl_GetPreferredClientSize(_In_ const GuiTerminalControl* lpControl, _Out_ LPSIZE lpSize);
 GUITERMINAL_CONTROL_API

@@ -53,6 +53,16 @@ GuiTerminalControl* GuiTerminalControl_GetFromWindow(_In_ HWND hWnd)
     return reinterpret_cast<GuiTerminalControl *>(GuiTerminal::Control::GetControl(hWnd));
 }
 
+VOID GuiTerminalControl_SetMouseClickCallback(_In_ GuiTerminalControl *lpControl, _In_opt_ GuiTerminalMouseClickCallback fnMouseClickCallback,
+                                              _In_opt_ LPVOID lpContext)
+{
+    if (lpControl)
+    {
+        ToCppControl(lpControl)->SetMouseClickCallback(reinterpret_cast<GuiTerminal::Control::MouseClickCallback>(fnMouseClickCallback),
+                                                       lpContext);
+    }
+}
+
 VOID GuiTerminalControl_Clear(_In_ GuiTerminalControl *lpControl)
 {
     if (lpControl)
@@ -233,6 +243,48 @@ VOID GuiTerminalControl_GetRegionLocation(_In_ GuiTerminalControl *lpControl, _I
     }
 }
 
+BOOL GuiTerminalControl_ConvertToRegionCoordinates(_In_ GuiTerminalControl *lpControl, _In_opt_ GuiTerminalRegion hRegion,
+                                                   _In_ INT iColTerminal, _In_ INT iRowTerminal, _Out_opt_ LPINT lpiColRegion,
+                                                   _Out_opt_ LPINT lpiRowRegion)
+{
+    if (!lpControl)
+    {
+        if (lpiColRegion)
+        {
+            *lpiColRegion = 0;
+        }
+        if (lpiRowRegion)
+        {
+            *lpiRowRegion = 0;
+        }
+        return FALSE;
+    }
+
+    return ToCppControl(lpControl)->ConvertToRegionCoordinates(ToCppRegion(hRegion), iColTerminal, iRowTerminal, lpiColRegion,
+                                                               lpiRowRegion);
+}
+
+BOOL GuiTerminalControl_ConvertFromRegionCoordinates(_In_ GuiTerminalControl *lpControl, _In_opt_ GuiTerminalRegion hRegion,
+                                                     _In_ INT iColRegion, _In_ INT iRowRegion, _Out_opt_ LPINT lpiColTerminal,
+                                                     _Out_opt_ LPINT lpiRowTerminal)
+{
+    if (!lpControl)
+    {
+        if (lpiColTerminal)
+        {
+            *lpiColTerminal = 0;
+        }
+        if (lpiRowTerminal)
+        {
+            *lpiRowTerminal = 0;
+        }
+        return FALSE;
+    }
+
+    return ToCppControl(lpControl)->ConvertFromRegionCoordinates(ToCppRegion(hRegion), iColRegion, iRowRegion, lpiColTerminal,
+                                                                 lpiRowTerminal);
+}
+
 
 HRESULT GuiTerminalControl_ResizeTerminal(_In_ GuiTerminalControl *lpControl, _In_ INT iCols, _In_ INT iRows)
 {
@@ -257,6 +309,43 @@ HRESULT GuiTerminalControl_GetCellSize(_In_ const GuiTerminalControl *lpControl,
     }
 
     return ToCppControl(lpControl)->GetCellSize(lpSize);
+}
+
+BOOL GuiTerminalControl_GetCellPosition(_In_ const GuiTerminalControl *lpControl, _In_ INT iCol, _In_ INT iRow, _Out_ LPRECT lprcCell)
+{
+    if (!lprcCell)
+    {
+        return FALSE;
+    }
+    lprcCell->left = 0;
+    lprcCell->top = 0;
+    lprcCell->right = 0;
+    lprcCell->bottom = 0;
+    if (!lpControl)
+    {
+        return FALSE;
+    }
+
+    return ToCppControl(lpControl)->GetCellPosition(iCol, iRow, lprcCell);
+}
+
+BOOL GuiTerminalControl_GetCellFromPosition(_In_ const GuiTerminalControl *lpControl, _In_ INT iX, _In_ INT iY, _Out_opt_ LPINT lpiCol,
+                                            _Out_opt_ LPINT lpiRow)
+{
+    if (lpiCol)
+    {
+        *lpiCol = 0;
+    }
+    if (lpiRow)
+    {
+        *lpiRow = 0;
+    }
+    if (!lpControl)
+    {
+        return FALSE;
+    }
+
+    return ToCppControl(lpControl)->GetCellFromPosition(iX, iY, lpiCol, lpiRow);
 }
 
 HRESULT GuiTerminalControl_GetPreferredClientSize(_In_ const GuiTerminalControl *lpControl, _Out_ LPSIZE lpSize)
