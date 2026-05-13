@@ -71,7 +71,7 @@ namespace GuiTerminal::Internals
         INT iCol;
         size_t uCellsCount;
 
-        if ((iCols <= 0) || (iRows <= 0))
+        if (iCols <= 0 || iRows <= 0)
         {
             return E_INVALIDARG;
         }
@@ -172,7 +172,7 @@ namespace GuiTerminal::Internals
         INT iFillY;
         Attributes attributesCell;
 
-        if ((iWidth <= 0) || (iHeight <= 0))
+        if (iWidth <= 0 || iHeight <= 0)
         {
             return;
         }
@@ -683,7 +683,7 @@ namespace GuiTerminal::Internals
         {
             return FALSE;
         }
-        if ((iColRegion < 0) || (iColRegion >= lpsRegionCurrent->iWidth) || (iRowRegion < 0) || (iRowRegion >= lpsRegionCurrent->iHeight))
+        if (iColRegion < 0 || iColRegion >= lpsRegionCurrent->iWidth || iRowRegion < 0 || iRowRegion >= lpsRegionCurrent->iHeight)
         {
             return FALSE;
         }
@@ -753,7 +753,7 @@ namespace GuiTerminal::Internals
         size_t uCellsCount;
         Cell cellBlank;
 
-        if ((m_iCols <= 0) || (m_iRows <= 0))
+        if (m_iCols <= 0 || m_iRows <= 0)
         {
             return E_INVALIDARG;
         }

@@ -3,7 +3,6 @@ EXPORTS
     GuiTerminalControl_Create
     GuiTerminalControl_WndProc
     GuiTerminalControl_GetFromWindow
-    GuiTerminalControl_SetMouseClickCallback
     GuiTerminalControl_Clear
     GuiTerminalControl_Scroll
     GuiTerminalControl_FillArea

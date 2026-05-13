@@ -77,6 +77,15 @@ sConfig = GuiTerminal::Control::Config{};
 - Use standard-library helpers exactly as this codebase already does when macro collisions are possible, for example `(std::min)(...)` and `(std::max)(...)`.
 - Keep exception handling narrow and compatibility-focused. Where the code catches allocation failures, continue mapping `std::bad_alloc` to `E_OUTOFMEMORY` and unexpected exceptions to `E_UNEXPECTED`.
 
+## Expression parentheses
+- Use parentheses to clarify precedence, not mechanically around every subexpression.
+- Avoid redundant parentheses in simple homogeneous boolean chains such as `a && b && c` or `a || b || c` when precedence is obvious.
+- Add parentheses when mixing `&&` and `||` in the same expression.
+- Add parentheses when a unary operator such as `!` applies to only part of a larger expression and the scope could be misread.
+- Prefer `if ((!ptr) || (*ptr == 0))` over `if (!ptr || *ptr == 0)` when the grouped intent is clearer.
+- Prefer `return ((a && b) || (c && d)) ? TRUE : FALSE;` over `return (a && b || c && d) ? TRUE : FALSE;` when mixed boolean operators are involved.
+- Do not add extra grouping that does not improve readability.
+
 ## Headers and API surface
 - Keep `#pragma once` in headers.
 - Do not expose implementation details from `src/` through public headers unless the API change requires it.

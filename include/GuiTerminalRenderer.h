@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include "GuiTerminalBuffer.h"
 #include <d2d1.h>
@@ -49,22 +49,22 @@ namespace GuiTerminal
         private:
             struct FontMetrics
             {
-                FLOAT fCellWidth{};
-                FLOAT fCellHeight{};
-                FLOAT fBaseline{};
-                FLOAT fUnderlineOffset{};
-                FLOAT fUnderlineThickness{};
+                INT iCellWidthPx{};
+                INT iCellHeightPx{};
+                INT iBaselinePx{};
+                INT iUnderlineOffsetPx{};
+                INT iUnderlineThicknessPx{};
                 std::wstring strFontFamilyW;
-                FLOAT fFontSize{ 18.0f };
+                FLOAT fFontSize{ 12.0f };
             };
 
             struct ScrollBarMetrics
             {
                 BOOL bVisible{ FALSE };
                 BOOL bHot{ FALSE };
-                D2D1_RECT_F rcTrack{};
-                D2D1_RECT_F rcThumb{};
-                FLOAT fThumbTravel{};
+                RECT rcTrack{};
+                RECT rcThumb{};
+                INT iThumbTravel{};
                 INT iViewportSize{};
                 INT iContentSize{};
                 INT iOffset{};
@@ -90,9 +90,9 @@ namespace GuiTerminal
             HWND m_hWnd{};
             FLOAT m_fDpiX{ 96.0f };
             FLOAT m_fDpiY{ 96.0f };
-            FLOAT m_fGridOffsetX{};
-            FLOAT m_fGridOffsetY{};
-            D2D1_RECT_F m_rcViewport{};
+            INT m_iGridOffsetX{};
+            INT m_iGridOffsetY{};
+            RECT m_rcViewport{};
             INT m_iCols{};
             INT m_iRows{};
             INT m_iClientWidth{};

@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include "GuiTerminalBuffer.h"
 #include "GuiTerminalRenderer.h"
@@ -17,30 +17,10 @@ namespace GuiTerminal
             INT iRows{ 25 };
             INT iCols{ 80 };
             LPCWSTR szFontFamilyW{ L"Consolas" };
-            FLOAT fFontSize{ 18.0f };
+            FLOAT fFontSize{ 12.0f };
             COLORREF crDefaultForeground{ RGB(204U, 204U, 204U) };
             COLORREF crDefaultBackground{ RGB(12U, 12U, 12U) };
         };
-
-        enum MouseClickEvent : DWORD
-        {
-            MouseClickEventLeftDown = 0U,
-            MouseClickEventLeftUp = 1U,
-            MouseClickEventRightDown = 2U,
-            MouseClickEventRightUp = 3U,
-            MouseClickEventMiddleDown = 4U,
-            MouseClickEventMiddleUp = 5U
-        };
-
-        enum MouseKeyFlags : DWORD
-        {
-            MouseKeyFlagNone = 0U,
-            MouseKeyFlagControl = 1U << 0,
-            MouseKeyFlagAlt = 1U << 1
-        };
-
-        typedef VOID (CALLBACK *MouseClickCallback)(_In_ Control* lpControl, _In_ MouseClickEvent eEvent, _In_ DWORD dwKeyFlags,
-                                                    _In_ INT iCol, _In_ INT iRow, _In_ INT iX, _In_ INT iY, _In_opt_ LPVOID lpContext);
 
         enum StyleFlags : DWORD
         {
@@ -142,10 +122,7 @@ namespace GuiTerminal
         HRESULT GetPreferredClientSize(_Out_ LPSIZE lpSize) const noexcept;
 
         // Return the preferred window size for the current terminal grid.
-        HRESULT GetPreferredWindowSize(_Out_ LPSIZE lpSize) const noexcept;
-
-        // Register a callback for mouse button events on terminal cells.
-        VOID SetMouseClickCallback(_In_opt_ MouseClickCallback fnMouseClickCallback, _In_opt_ LPVOID lpContext) noexcept;
+        HRESULT GetPreferredWindowSize(_Out_ LPSIZE lpSize, _In_opt_ BOOL bHasMenu = FALSE) const noexcept;
 
     private:
         enum ScrollBarPart
@@ -166,9 +143,6 @@ namespace GuiTerminal
 
         // Update pixel-based scrolling and scroll bar visibility after size/content changes.
         VOID UpdateScrollBars() noexcept;
-
-        // Translate the client coordinates to a terminal cell and dispatch the callback.
-        BOOL InvokeMouseClickCallback(_In_ MouseClickEvent eEvent, _In_ DWORD dwKeyFlags, _In_ INT iX, _In_ INT iY) noexcept;
 
         // Update drag/hover state for custom scroll bars.
         BOOL HandleMouseMove(_In_ INT iX, _In_ INT iY) noexcept;
@@ -196,8 +170,6 @@ namespace GuiTerminal
         INT m_iScrollDragOriginY{};
         INT m_iScrollOffsetOriginX{};
         INT m_iScrollOffsetOriginY{};
-        MouseClickCallback m_fnMouseClickCallback{};
-        LPVOID m_lpMouseClickCallbackContext{};
         Internals::Buffer m_sBuffer;
         Internals::Renderer m_sRenderer;
     };

@@ -53,16 +53,6 @@ GuiTerminalControl* GuiTerminalControl_GetFromWindow(_In_ HWND hWnd)
     return reinterpret_cast<GuiTerminalControl *>(GuiTerminal::Control::GetControl(hWnd));
 }
 
-VOID GuiTerminalControl_SetMouseClickCallback(_In_ GuiTerminalControl *lpControl, _In_opt_ GuiTerminalMouseClickCallback fnMouseClickCallback,
-                                              _In_opt_ LPVOID lpContext)
-{
-    if (lpControl)
-    {
-        ToCppControl(lpControl)->SetMouseClickCallback(reinterpret_cast<GuiTerminal::Control::MouseClickCallback>(fnMouseClickCallback),
-                                                       lpContext);
-    }
-}
-
 VOID GuiTerminalControl_Clear(_In_ GuiTerminalControl *lpControl)
 {
     if (lpControl)
@@ -363,7 +353,7 @@ HRESULT GuiTerminalControl_GetPreferredClientSize(_In_ const GuiTerminalControl 
     return ToCppControl(lpControl)->GetPreferredClientSize(lpSize);
 }
 
-HRESULT GuiTerminalControl_GetPreferredWindowSize(_In_ const GuiTerminalControl *lpControl, _Out_ LPSIZE lpSize)
+HRESULT GuiTerminalControl_GetPreferredWindowSize(_In_ const GuiTerminalControl *lpControl, _Out_ LPSIZE lpSize, _In_opt_ BOOL bHasMenu)
 {
     if (!lpSize)
     {
@@ -375,7 +365,7 @@ HRESULT GuiTerminalControl_GetPreferredWindowSize(_In_ const GuiTerminalControl 
         return E_POINTER;
     }
 
-    return ToCppControl(lpControl)->GetPreferredWindowSize(lpSize);
+    return ToCppControl(lpControl)->GetPreferredWindowSize(lpSize, bHasMenu);
 }
 
 } // extern "C"
