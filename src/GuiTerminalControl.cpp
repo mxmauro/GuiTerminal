@@ -309,6 +309,20 @@ namespace GuiTerminal
         }
     }
 
+    HRESULT Control::SetContext(_In_opt_ PVOID lpContext) noexcept
+    {
+        std::lock_guard<std::mutex> lockGuard(m_mutex);
+
+        return m_sBuffer.SetRegionContext(nullptr, lpContext);
+    }
+
+    PVOID Control::GetContext() const noexcept
+    {
+        std::lock_guard<std::mutex> lockGuard(m_mutex);
+
+        return m_sBuffer.GetRegionContext(nullptr);
+    }
+
     HRESULT Control::CreateRegion(_In_ INT iX, _In_ INT iY, _In_ INT iWidth, _In_ INT iHeight, _Out_ RegionHandle* lphRegion) noexcept
     {
         std::lock_guard<std::mutex> lockGuard(m_mutex);
@@ -466,16 +480,65 @@ namespace GuiTerminal
         return m_sBuffer.SendRegionToBack(hRegion);
     }
 
-    VOID Control::GetRegionLocation(_In_opt_ RegionHandle hRegion, _Out_opt_ LPINT lpiX, _Out_opt_ LPINT lpiY, _Out_opt_ LPINT lpiWidth,
+    HRESULT Control::MoveRegionAfter(_In_ RegionHandle hRegion, _In_opt_ RegionHandle hRegionReference) noexcept
+    {
+        std::lock_guard<std::mutex> lockGuard(m_mutex);
+
+        if (!hRegion)
+        {
+            return E_POINTER;
+        }
+        return m_sBuffer.MoveRegionAfter(hRegion, hRegionReference);
+    }
+
+    HRESULT Control::SetRegionContext(_In_opt_ RegionHandle hRegion, _In_opt_ PVOID lpContext) noexcept
+    {
+        std::lock_guard<std::mutex> lockGuard(m_mutex);
+
+        return m_sBuffer.SetRegionContext(hRegion, lpContext);
+    }
+
+    PVOID Control::GetRegionContext(_In_opt_ RegionHandle hRegion) const noexcept
+    {
+        std::lock_guard<std::mutex> lockGuard(m_mutex);
+
+        return m_sBuffer.GetRegionContext(hRegion);
+    }
+
+    RegionHandle Control::GetFirstRegion() const noexcept
+    {
+        std::lock_guard<std::mutex> lockGuard(m_mutex);
+
+        return m_sBuffer.GetFirstRegion();
+    }
+
+    RegionHandle Control::GetLastRegion() const noexcept
+    {
+        std::lock_guard<std::mutex> lockGuard(m_mutex);
+
+        return m_sBuffer.GetLastRegion();
+    }
+
+    RegionHandle Control::GetNextRegion(_In_opt_ RegionHandle hRegion) const noexcept
+    {
+        std::lock_guard<std::mutex> lockGuard(m_mutex);
+
+        return m_sBuffer.GetNextRegion(hRegion);
+    }
+
+    RegionHandle Control::GetPreviousRegion(_In_opt_ RegionHandle hRegion) const noexcept
+    {
+        std::lock_guard<std::mutex> lockGuard(m_mutex);
+
+        return m_sBuffer.GetPreviousRegion(hRegion);
+    }
+
+    VOID Control::GetRegionLocation(_In_ RegionHandle hRegion, _Out_opt_ LPINT lpiX, _Out_opt_ LPINT lpiY, _Out_opt_ LPINT lpiWidth,
                                     _Out_opt_ LPINT lpiHeight) const noexcept
     {
         std::lock_guard<std::mutex> lockGuard(m_mutex);
 
-        if (hRegion)
-        {
-            m_sBuffer.GetRegionLocation(hRegion, lpiX, lpiY, lpiWidth, lpiHeight);
-        }
-        else
+        if (!hRegion)
         {
             if (lpiX)
             {
@@ -491,24 +554,49 @@ namespace GuiTerminal
             }
             if (lpiHeight)
             {
-                *lpiHeight = m_iRows;
+                *lpiHeight = 0;
             }
+            return;
+        }
+
+        m_sBuffer.GetRegionLocation(hRegion, lpiX, lpiY, lpiWidth, lpiHeight);
+    }
+
+    VOID Control::GetTerminalSize(_Out_opt_ LPINT lpiCols, _Out_opt_ LPINT lpiRows) const noexcept
+    {
+        std::lock_guard<std::mutex> lockGuard(m_mutex);
+
+        if (lpiCols)
+        {
+            *lpiCols = m_iCols;
+        }
+        if (lpiRows)
+        {
+            *lpiRows = m_iRows;
         }
     }
 
-    BOOL Control::ConvertToRegionCoordinates(_In_opt_ RegionHandle hRegion, _In_ INT iColTerminal, _In_ INT iRowTerminal,
+    BOOL Control::ConvertToRegionCoordinates(_In_ RegionHandle hRegion, _In_ INT iColTerminal, _In_ INT iRowTerminal,
                                              _Out_opt_ LPINT lpiColRegion, _Out_opt_ LPINT lpiRowRegion) const noexcept
     {
         std::lock_guard<std::mutex> lockGuard(m_mutex);
 
+        if (!hRegion)
+        {
+            return FALSE;
+        }
         return m_sBuffer.ConvertToRegionCoordinates(hRegion, iColTerminal, iRowTerminal, lpiColRegion, lpiRowRegion);
     }
 
-    BOOL Control::ConvertFromRegionCoordinates(_In_opt_ RegionHandle hRegion, _In_ INT iColRegion, _In_ INT iRowRegion,
+    BOOL Control::ConvertFromRegionCoordinates(_In_ RegionHandle hRegion, _In_ INT iColRegion, _In_ INT iRowRegion,
                                                _Out_opt_ LPINT lpiColTerminal, _Out_opt_ LPINT lpiRowTerminal) const noexcept
     {
         std::lock_guard<std::mutex> lockGuard(m_mutex);
 
+        if (!hRegion)
+        {
+            return FALSE;
+        }
         return m_sBuffer.ConvertFromRegionCoordinates(hRegion, iColRegion, iRowRegion, lpiColTerminal, lpiRowTerminal);
     }
 

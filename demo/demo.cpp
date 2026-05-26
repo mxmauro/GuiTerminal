@@ -40,8 +40,6 @@ typedef struct DemoState
     DemoRegionMotion sMotionFront;
     DemoRegionMotion sMotionBanner;
     DemoRegionMotion sMotionOffscreen;
-    GuiTerminal::RegionHandle rghZOrder[4];
-    INT iZOrderCount;
 } DemoState;
 
 typedef struct DemoMouseCallbackContext
@@ -68,6 +66,7 @@ static VOID DrawRegionFrames(_In_ GuiTerminal::Control* lpGuiTerminal, _In_opt_ 
                              _In_opt_ GuiTerminal::RegionHandle hRegionBanner,
                              _In_opt_ GuiTerminal::RegionHandle hRegionOffscreen) noexcept;
 static VOID UpdateRegionMotion(_Inout_ DemoRegionMotion* lpsMotion) noexcept;
+static DemoRegionMotion* GetMotionForRegion(_In_ GuiTerminal::RegionHandle hRegion) noexcept;
 static VOID BringDemoRegionToFront(_In_ GuiTerminal::Control* lpGuiTerminal, _In_ GuiTerminal::RegionHandle hRegion) noexcept;
 static GuiTerminal::RegionHandle HitTestDemoRegion(_In_ INT iCol, _In_ INT iRow) noexcept;
 static BOOL IsCellInsideMotion(_In_ const DemoRegionMotion* lpsMotion, _In_ INT iCol, _In_ INT iRow) noexcept;
@@ -384,6 +383,26 @@ static HRESULT RunDemo(_In_ GuiTerminal::Control* lpGuiTerminal) noexcept
     g_sDemoState.sMotionFront = DemoRegionMotion{ hRegionFront, 22, 9, 34, 13, 22, 42, 9, 9, -1, 0 };
     g_sDemoState.sMotionBanner = DemoRegionMotion{ hRegionBanner, -6, 6, 26, 4, -6, -6, 6, 12, 0, 1 };
     g_sDemoState.sMotionOffscreen = DemoRegionMotion{ hRegionOffscreen, 154, 10, 12, 5, 132, 154, 10, 18, -1, 1 };
+    hr = lpGuiTerminal->SetRegionContext(hRegionBack, &g_sDemoState.sMotionBack);
+    if (FAILED(hr))
+    {
+        return hr;
+    }
+    hr = lpGuiTerminal->SetRegionContext(hRegionFront, &g_sDemoState.sMotionFront);
+    if (FAILED(hr))
+    {
+        return hr;
+    }
+    hr = lpGuiTerminal->SetRegionContext(hRegionBanner, &g_sDemoState.sMotionBanner);
+    if (FAILED(hr))
+    {
+        return hr;
+    }
+    hr = lpGuiTerminal->SetRegionContext(hRegionOffscreen, &g_sDemoState.sMotionOffscreen);
+    if (FAILED(hr))
+    {
+        return hr;
+    }
 
     lpGuiTerminal->WriteRegion(hRegionBack, L"\x1b[44;97m Back region \x1b[0m\r\n");
     lpGuiTerminal->WriteRegion(hRegionFront, L"\x1b[42;30m Front region \x1b[0m\r\n");
@@ -456,11 +475,6 @@ static HRESULT RunDemo(_In_ GuiTerminal::Control* lpGuiTerminal) noexcept
     lpGuiTerminal->BringRegionToFront(hRegionBanner);
     BringDemoRegionToFront(lpGuiTerminal, hRegionFront);
     BringDemoRegionToFront(lpGuiTerminal, hRegionBanner);
-    g_sDemoState.rghZOrder[0] = hRegionBack;
-    g_sDemoState.rghZOrder[1] = hRegionOffscreen;
-    g_sDemoState.rghZOrder[2] = hRegionFront;
-    g_sDemoState.rghZOrder[3] = hRegionBanner;
-    g_sDemoState.iZOrderCount = 4;
     DrawRegionFrames(lpGuiTerminal, hRegionStatus, hRegionBack, hRegionFront, hRegionBanner, hRegionOffscreen);
 
     return S_OK;
@@ -543,67 +557,48 @@ static VOID UpdateRegionMotion(_Inout_ DemoRegionMotion* lpsMotion) noexcept
     }
 }
 
+static DemoRegionMotion* GetMotionForRegion(_In_ GuiTerminal::RegionHandle hRegion) noexcept
+{
+    if (!g_sDemoState.lpGuiTerminal || !hRegion)
+    {
+        return nullptr;
+    }
+
+    return reinterpret_cast<DemoRegionMotion*>(g_sDemoState.lpGuiTerminal->GetRegionContext(hRegion));
+}
+
 static VOID BringDemoRegionToFront(_In_ GuiTerminal::Control* lpGuiTerminal, _In_ GuiTerminal::RegionHandle hRegion) noexcept
 {
-    INT iIndex;
-    INT iFoundIndex;
-
     if (!lpGuiTerminal || !hRegion)
     {
         return;
     }
 
     lpGuiTerminal->BringRegionToFront(hRegion);
-    iFoundIndex = -1;
-    for (iIndex = 0; iIndex < g_sDemoState.iZOrderCount; ++iIndex)
-    {
-        if (g_sDemoState.rghZOrder[iIndex] == hRegion)
-        {
-            iFoundIndex = iIndex;
-            break;
-        }
-    }
-    if (iFoundIndex < 0)
-    {
-        return;
-    }
-    for (iIndex = iFoundIndex; iIndex < g_sDemoState.iZOrderCount - 1; ++iIndex)
-    {
-        g_sDemoState.rghZOrder[iIndex] = g_sDemoState.rghZOrder[iIndex + 1];
-    }
-    g_sDemoState.rghZOrder[g_sDemoState.iZOrderCount - 1] = hRegion;
 }
 
 static GuiTerminal::RegionHandle HitTestDemoRegion(_In_ INT iCol, _In_ INT iRow) noexcept
 {
-    INT iIndex;
+    GuiTerminal::RegionHandle hRegionCurrent;
+    DemoRegionMotion* lpsMotion;
 
     if (iCol < 0 || iRow < 0)
     {
         return nullptr;
     }
 
-    for (iIndex = g_sDemoState.iZOrderCount - 1; iIndex >= 0; --iIndex)
+    if (!g_sDemoState.lpGuiTerminal)
     {
-        if (g_sDemoState.rghZOrder[iIndex] == g_sDemoState.sMotionBanner.hRegion &&
-            IsCellInsideMotion(&g_sDemoState.sMotionBanner, iCol, iRow) != FALSE)
+        return nullptr;
+    }
+
+    for (hRegionCurrent = g_sDemoState.lpGuiTerminal->GetFirstRegion(); hRegionCurrent;
+         hRegionCurrent = g_sDemoState.lpGuiTerminal->GetNextRegion(hRegionCurrent))
+    {
+        lpsMotion = GetMotionForRegion(hRegionCurrent);
+        if (IsCellInsideMotion(lpsMotion, iCol, iRow) != FALSE)
         {
-            return g_sDemoState.sMotionBanner.hRegion;
-        }
-        if (g_sDemoState.rghZOrder[iIndex] == g_sDemoState.sMotionFront.hRegion &&
-            IsCellInsideMotion(&g_sDemoState.sMotionFront, iCol, iRow) != FALSE)
-        {
-            return g_sDemoState.sMotionFront.hRegion;
-        }
-        if (g_sDemoState.rghZOrder[iIndex] == g_sDemoState.sMotionBack.hRegion &&
-            IsCellInsideMotion(&g_sDemoState.sMotionBack, iCol, iRow) != FALSE)
-        {
-            return g_sDemoState.sMotionBack.hRegion;
-        }
-        if (g_sDemoState.rghZOrder[iIndex] == g_sDemoState.sMotionOffscreen.hRegion &&
-            IsCellInsideMotion(&g_sDemoState.sMotionOffscreen, iCol, iRow) != FALSE)
-        {
-            return g_sDemoState.sMotionOffscreen.hRegion;
+            return hRegionCurrent;
         }
     }
     return nullptr;

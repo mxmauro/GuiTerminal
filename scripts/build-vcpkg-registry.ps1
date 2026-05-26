@@ -157,12 +157,10 @@ function Update-GitVersionsFile {
         $existing = Get-Content $FilePath -Raw | ConvertFrom-Json
         if ($existing.versions) {
             foreach ($entry in $existing.versions) {
-                if ($entry.'version-string' -ne $Version) {
-                    $versions += @{
-                        "version-string" = $entry.'version-string'
-                        "port-version" = [int]$entry.'port-version'
-                        "git-tree" = $entry.'git-tree'
-                    }
+                $entryVersion = if ($null -ne $entry.version) { $entry.version } else { $entry.'version-string' }
+
+                if ($entryVersion -ne $Version) {
+                    $versions += $entry
                 }
             }
         }
@@ -170,7 +168,7 @@ function Update-GitVersionsFile {
 
     $versions = @(
         @{
-            "version-string" = $Version
+            version = $Version
             "port-version" = 0
             "git-tree" = $GitTree
         }
@@ -198,12 +196,10 @@ function Update-FilesystemVersionsFile {
         $existing = Get-Content $FilePath -Raw | ConvertFrom-Json
         if ($existing.versions) {
             foreach ($entry in $existing.versions) {
-                if ($entry.'version-string' -ne $Version) {
-                    $versions += @{
-                        "version-string" = $entry.'version-string'
-                        "port-version" = [int]$entry.'port-version'
-                        path = $entry.path
-                    }
+                $entryVersion = if ($null -ne $entry.version) { $entry.version } else { $entry.'version-string' }
+
+                if ($entryVersion -ne $Version) {
+                    $versions += $entry
                 }
             }
         }
@@ -211,7 +207,7 @@ function Update-FilesystemVersionsFile {
 
     $versions = @(
         @{
-            "version-string" = $Version
+            version = $Version
             "port-version" = 0
             path = ("$/ports/{0}/{1}" -f $PortName, $Version)
         }
@@ -301,7 +297,7 @@ New-Item -ItemType Directory -Force -Path $versionPrefixRoot | Out-Null
 
 $portManifest = @{
     name = $PortName
-    "version-string" = $Version
+    version = $Version
     description = $PackageDescription
     homepage = $PackageHomepage
     license = $PackageLicense

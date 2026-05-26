@@ -95,6 +95,10 @@ namespace GuiTerminal
         VOID Print(_In_z_ LPCWSTR szFormatW, ...) noexcept;
         // Format and write UTF-16 text to the default region.
         VOID PrintV(_In_z_ LPCWSTR szFormatW, _In_ va_list argList) noexcept;
+        // Associates a context pointer with the default region.
+        HRESULT SetContext(_In_opt_ PVOID lpContext) noexcept;
+        // Returns the context pointer associated with the default region.
+        PVOID GetContext() const noexcept;
 
         // Create a region inside the terminal in cell coordinates.
         HRESULT CreateRegion(_In_ INT iX, _In_ INT iY, _In_ INT iWidth, _In_ INT iHeight, _Out_ RegionHandle* lphRegion) noexcept;
@@ -135,17 +139,33 @@ namespace GuiTerminal
         HRESULT BringRegionToFront(_In_ RegionHandle hRegion) noexcept;
         // Moves the specified region behind all non-root regions.
         HRESULT SendRegionToBack(_In_ RegionHandle hRegion) noexcept;
+        // Moves the specified region immediately after the reference region, or to the top when the reference handle is null.
+        HRESULT MoveRegionAfter(_In_ RegionHandle hRegion, _In_opt_ RegionHandle hRegionReference) noexcept;
+        // Associates a context pointer with the specified region, or the default region when the handle is null.
+        HRESULT SetRegionContext(_In_opt_ RegionHandle hRegion, _In_opt_ PVOID lpContext) noexcept;
+        // Returns the context pointer associated with the specified region, or the default region when the handle is null.
+        PVOID GetRegionContext(_In_opt_ RegionHandle hRegion) const noexcept;
+        // Returns the frontmost non-root region, or null when no created regions exist.
+        RegionHandle GetFirstRegion() const noexcept;
+        // Returns the backmost non-root region, or null when no created regions exist.
+        RegionHandle GetLastRegion() const noexcept;
+        // Returns the next region toward the back, or the first region when the handle is null.
+        RegionHandle GetNextRegion(_In_opt_ RegionHandle hRegion) const noexcept;
+        // Returns the previous region toward the front, or the last region when the handle is null.
+        RegionHandle GetPreviousRegion(_In_opt_ RegionHandle hRegion) const noexcept;
 
         // Gets the location of the specified region in cell coordinates.
-        VOID GetRegionLocation(_In_opt_ RegionHandle hRegion, _Out_opt_ LPINT lpiX, _Out_opt_ LPINT lpiY, _Out_opt_ LPINT lpiWidth,
+        VOID GetRegionLocation(_In_ RegionHandle hRegion, _Out_opt_ LPINT lpiX, _Out_opt_ LPINT lpiY, _Out_opt_ LPINT lpiWidth,
                                _Out_opt_ LPINT lpiHeight) const noexcept;
+        // Return the current terminal grid size in cells.
+        VOID GetTerminalSize(_Out_opt_ LPINT lpiCols, _Out_opt_ LPINT lpiRows) const noexcept;
 
-        // Convert zero-based terminal coordinates to zero-based region coordinates.
-        BOOL ConvertToRegionCoordinates(_In_opt_ RegionHandle hRegion, _In_ INT iColTerminal, _In_ INT iRowTerminal,
+        // Convert zero-based terminal coordinates to zero-based region coordinates for a specific region.
+        BOOL ConvertToRegionCoordinates(_In_ RegionHandle hRegion, _In_ INT iColTerminal, _In_ INT iRowTerminal,
                                         _Out_opt_ LPINT lpiColRegion, _Out_opt_ LPINT lpiRowRegion) const noexcept;
 
-        // Convert zero-based region coordinates to zero-based terminal coordinates.
-        BOOL ConvertFromRegionCoordinates(_In_opt_ RegionHandle hRegion, _In_ INT iColRegion, _In_ INT iRowRegion,
+        // Convert zero-based region coordinates to zero-based terminal coordinates for a specific region.
+        BOOL ConvertFromRegionCoordinates(_In_ RegionHandle hRegion, _In_ INT iColRegion, _In_ INT iRowRegion,
                                           _Out_opt_ LPINT lpiColTerminal, _Out_opt_ LPINT lpiRowTerminal) const noexcept;
 
         // Resize the logical terminal grid.

@@ -95,6 +95,10 @@ GUITERMINAL_CONTROL_API
 VOID GuiTerminalControl_Print(_In_ GuiTerminalControl* lpControl, _In_z_ LPCWSTR szFormatW, ...);
 GUITERMINAL_CONTROL_API
 VOID GuiTerminalControl_PrintV(_In_ GuiTerminalControl *lpControl, _In_z_ LPCWSTR szFormatW, _In_ va_list argList);
+GUITERMINAL_CONTROL_API
+HRESULT GuiTerminalControl_SetContext(_In_ GuiTerminalControl *lpControl, _In_opt_ PVOID lpContext);
+GUITERMINAL_CONTROL_API
+PVOID GuiTerminalControl_GetContext(_In_ const GuiTerminalControl *lpControl);
 
 GUITERMINAL_CONTROL_API
 HRESULT GuiTerminalControl_CreateRegion(_In_ GuiTerminalControl* lpControl, _In_ INT iX, _In_ INT iY, _In_ INT iWidth, _In_ INT iHeight,
@@ -137,14 +141,32 @@ HRESULT GuiTerminalControl_BringRegionToFront(_In_ GuiTerminalControl *lpControl
 GUITERMINAL_CONTROL_API
 HRESULT GuiTerminalControl_SendRegionToBack(_In_ GuiTerminalControl *lpControl, _In_ GuiTerminalRegion hRegion);
 GUITERMINAL_CONTROL_API
-VOID GuiTerminalControl_GetRegionLocation(_In_ GuiTerminalControl *lpControl, _In_opt_  GuiTerminalRegion hRegion, _Out_opt_ LPINT lpiX,
+HRESULT GuiTerminalControl_MoveRegionAfter(_In_ GuiTerminalControl *lpControl, _In_ GuiTerminalRegion hRegion,
+                                           _In_opt_ GuiTerminalRegion hRegionReference);
+GUITERMINAL_CONTROL_API
+HRESULT GuiTerminalControl_SetRegionContext(_In_ GuiTerminalControl *lpControl, _In_opt_ GuiTerminalRegion hRegion,
+                                            _In_opt_ PVOID lpContext);
+GUITERMINAL_CONTROL_API
+PVOID GuiTerminalControl_GetRegionContext(_In_ const GuiTerminalControl *lpControl, _In_opt_ GuiTerminalRegion hRegion);
+GUITERMINAL_CONTROL_API
+GuiTerminalRegion GuiTerminalControl_GetFirstRegion(_In_ const GuiTerminalControl *lpControl);
+GUITERMINAL_CONTROL_API
+GuiTerminalRegion GuiTerminalControl_GetLastRegion(_In_ const GuiTerminalControl *lpControl);
+GUITERMINAL_CONTROL_API
+GuiTerminalRegion GuiTerminalControl_GetNextRegion(_In_ const GuiTerminalControl *lpControl, _In_opt_ GuiTerminalRegion hRegion);
+GUITERMINAL_CONTROL_API
+GuiTerminalRegion GuiTerminalControl_GetPreviousRegion(_In_ const GuiTerminalControl *lpControl, _In_opt_ GuiTerminalRegion hRegion);
+GUITERMINAL_CONTROL_API
+VOID GuiTerminalControl_GetRegionLocation(_In_ GuiTerminalControl *lpControl, _In_ GuiTerminalRegion hRegion, _Out_opt_ LPINT lpiX,
                                           _Out_opt_ LPINT lpiY, _Out_opt_ LPINT lpiWidth, _Out_opt_ LPINT lpiHeight);
 GUITERMINAL_CONTROL_API
-BOOL GuiTerminalControl_ConvertToRegionCoordinates(_In_ GuiTerminalControl *lpControl, _In_opt_ GuiTerminalRegion hRegion,
+VOID GuiTerminalControl_GetTerminalSize(_In_ const GuiTerminalControl *lpControl, _Out_opt_ LPINT lpiCols, _Out_opt_ LPINT lpiRows);
+GUITERMINAL_CONTROL_API
+BOOL GuiTerminalControl_ConvertToRegionCoordinates(_In_ GuiTerminalControl *lpControl, _In_ GuiTerminalRegion hRegion,
                                                    _In_ INT iColTerminal, _In_ INT iRowTerminal, _Out_opt_ LPINT lpiColRegion,
                                                    _Out_opt_ LPINT lpiRowRegion);
 GUITERMINAL_CONTROL_API
-BOOL GuiTerminalControl_ConvertFromRegionCoordinates(_In_ GuiTerminalControl *lpControl, _In_opt_ GuiTerminalRegion hRegion,
+BOOL GuiTerminalControl_ConvertFromRegionCoordinates(_In_ GuiTerminalControl *lpControl, _In_ GuiTerminalRegion hRegion,
                                                      _In_ INT iColRegion, _In_ INT iRowRegion, _Out_opt_ LPINT lpiColTerminal,
                                                      _Out_opt_ LPINT lpiRowTerminal);
 

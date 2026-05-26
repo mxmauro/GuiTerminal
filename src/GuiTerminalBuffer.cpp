@@ -843,6 +843,207 @@ namespace GuiTerminal::Internals
         return S_OK;
     }
 
+    HRESULT Buffer::MoveRegionAfter(_In_ RegionHandle hRegion, _In_opt_ RegionHandle hRegionReference) noexcept
+    {
+        auto itOrder = m_vecRegionOrder.end();
+        auto itReference = m_vecRegionOrder.end();
+        INT iRegionId;
+
+        if (!hRegion || hRegion->iId == 0)
+        {
+            return E_INVALIDARG;
+        }
+        if (ResolveRegion(hRegion) != hRegion)
+        {
+            return HRESULT_FROM_WIN32(ERROR_NOT_FOUND);
+        }
+        if (hRegionReference)
+        {
+            if (hRegionReference->iId == 0)
+            {
+                return E_INVALIDARG;
+            }
+            if (ResolveRegion(hRegionReference) != hRegionReference)
+            {
+                return HRESULT_FROM_WIN32(ERROR_NOT_FOUND);
+            }
+        }
+        if (hRegion == hRegionReference)
+        {
+            return S_OK;
+        }
+
+        itOrder = std::find(m_vecRegionOrder.begin(), m_vecRegionOrder.end(), hRegion->iId);
+        if (itOrder == m_vecRegionOrder.end())
+        {
+            return E_UNEXPECTED;
+        }
+
+        iRegionId = *itOrder;
+        m_vecRegionOrder.erase(itOrder);
+
+        if (!hRegionReference)
+        {
+            m_vecRegionOrder.push_back(iRegionId);
+            return S_OK;
+        }
+
+        itReference = std::find(m_vecRegionOrder.begin(), m_vecRegionOrder.end(), hRegionReference->iId);
+        if (itReference == m_vecRegionOrder.end())
+        {
+            return E_UNEXPECTED;
+        }
+
+        m_vecRegionOrder.insert(itReference + 1, iRegionId);
+        return S_OK;
+    }
+
+    HRESULT Buffer::SetRegionContext(_In_opt_ RegionHandle hRegion, _In_opt_ PVOID lpContext) noexcept
+    {
+        Region_s* lpsRegionCurrent;
+
+        lpsRegionCurrent = ResolveRegion(hRegion);
+        if (!lpsRegionCurrent)
+        {
+            return HRESULT_FROM_WIN32(ERROR_NOT_FOUND);
+        }
+
+        lpsRegionCurrent->lpContext = lpContext;
+        return S_OK;
+    }
+
+    PVOID Buffer::GetRegionContext(_In_opt_ RegionHandle hRegion) const noexcept
+    {
+        const Region_s* lpsRegionCurrent;
+
+        lpsRegionCurrent = ResolveRegion(hRegion);
+        if (!lpsRegionCurrent)
+        {
+            return nullptr;
+        }
+
+        return lpsRegionCurrent->lpContext;
+    }
+
+    RegionHandle Buffer::GetFirstRegion() const noexcept
+    {
+        auto itOrder = m_vecRegionOrder.rbegin();
+        auto itRegion = m_mapRegions.end();
+
+        for (; itOrder != m_vecRegionOrder.rend(); ++itOrder)
+        {
+            if (*itOrder == 0)
+            {
+                continue;
+            }
+
+            itRegion = m_mapRegions.find(*itOrder);
+            if (itRegion != m_mapRegions.end())
+            {
+                return const_cast<Region_s*>(&itRegion->second);
+            }
+        }
+
+        return nullptr;
+    }
+
+    RegionHandle Buffer::GetLastRegion() const noexcept
+    {
+        auto itOrder = m_vecRegionOrder.begin();
+        auto itRegion = m_mapRegions.end();
+
+        for (; itOrder != m_vecRegionOrder.end(); ++itOrder)
+        {
+            if (*itOrder == 0)
+            {
+                continue;
+            }
+
+            itRegion = m_mapRegions.find(*itOrder);
+            if (itRegion != m_mapRegions.end())
+            {
+                return const_cast<Region_s*>(&itRegion->second);
+            }
+        }
+
+        return nullptr;
+    }
+
+    RegionHandle Buffer::GetNextRegion(_In_opt_ RegionHandle hRegion) const noexcept
+    {
+        auto itOrder = m_vecRegionOrder.end();
+        auto itRegion = m_mapRegions.end();
+
+        if (!hRegion)
+        {
+            return GetFirstRegion();
+        }
+        if (ResolveRegion(hRegion) != hRegion || hRegion->iId == 0)
+        {
+            return nullptr;
+        }
+
+        itOrder = std::find(m_vecRegionOrder.begin(), m_vecRegionOrder.end(), hRegion->iId);
+        if (itOrder == m_vecRegionOrder.end())
+        {
+            return nullptr;
+        }
+
+        while (itOrder != m_vecRegionOrder.begin())
+        {
+            --itOrder;
+            if (*itOrder == 0)
+            {
+                continue;
+            }
+
+            itRegion = m_mapRegions.find(*itOrder);
+            if (itRegion != m_mapRegions.end())
+            {
+                return const_cast<Region_s*>(&itRegion->second);
+            }
+        }
+
+        return nullptr;
+    }
+
+    RegionHandle Buffer::GetPreviousRegion(_In_opt_ RegionHandle hRegion) const noexcept
+    {
+        auto itOrder = m_vecRegionOrder.end();
+        auto itRegion = m_mapRegions.end();
+
+        if (!hRegion)
+        {
+            return GetLastRegion();
+        }
+        if (ResolveRegion(hRegion) != hRegion || hRegion->iId == 0)
+        {
+            return nullptr;
+        }
+
+        itOrder = std::find(m_vecRegionOrder.begin(), m_vecRegionOrder.end(), hRegion->iId);
+        if (itOrder == m_vecRegionOrder.end())
+        {
+            return nullptr;
+        }
+
+        for (++itOrder; itOrder != m_vecRegionOrder.end(); ++itOrder)
+        {
+            if (*itOrder == 0)
+            {
+                continue;
+            }
+
+            itRegion = m_mapRegions.find(*itOrder);
+            if (itRegion != m_mapRegions.end())
+            {
+                return const_cast<Region_s*>(&itRegion->second);
+            }
+        }
+
+        return nullptr;
+    }
+
     VOID Buffer::GetRegionLocation(_In_ RegionHandle hRegion, _Out_opt_ LPINT lpiX, _Out_opt_ LPINT lpiY, _Out_opt_ LPINT lpiWidth,
                                    _Out_opt_ LPINT lpiHeight) const noexcept
     {
@@ -872,7 +1073,7 @@ namespace GuiTerminal::Internals
         }
     }
 
-    BOOL Buffer::ConvertToRegionCoordinates(_In_opt_ RegionHandle hRegion, _In_ INT iColTerminal, _In_ INT iRowTerminal,
+    BOOL Buffer::ConvertToRegionCoordinates(_In_ RegionHandle hRegion, _In_ INT iColTerminal, _In_ INT iRowTerminal,
                                             _Out_opt_ LPINT lpiColRegion, _Out_opt_ LPINT lpiRowRegion) const noexcept
     {
         const Region_s* lpsRegionCurrent;
@@ -886,6 +1087,10 @@ namespace GuiTerminal::Internals
         if (lpiRowRegion)
         {
             *lpiRowRegion = 0;
+        }
+        if (!hRegion)
+        {
+            return FALSE;
         }
 
         lpsRegionCurrent = ResolveRegion(hRegion);
@@ -915,7 +1120,7 @@ namespace GuiTerminal::Internals
         return TRUE;
     }
 
-    BOOL Buffer::ConvertFromRegionCoordinates(_In_opt_ RegionHandle hRegion, _In_ INT iColRegion, _In_ INT iRowRegion,
+    BOOL Buffer::ConvertFromRegionCoordinates(_In_ RegionHandle hRegion, _In_ INT iColRegion, _In_ INT iRowRegion,
                                               _Out_opt_ LPINT lpiColTerminal, _Out_opt_ LPINT lpiRowTerminal) const noexcept
     {
         const Region_s* lpsRegionCurrent;
@@ -929,6 +1134,10 @@ namespace GuiTerminal::Internals
         if (lpiRowTerminal)
         {
             *lpiRowTerminal = 0;
+        }
+        if (!hRegion)
+        {
+            return FALSE;
         }
 
         lpsRegionCurrent = ResolveRegion(hRegion);

@@ -44,6 +44,7 @@ namespace GuiTerminal
             INT iCursorY{};
             CursorState sCursorSaved;
             BOOL bWrapPending{ FALSE };
+            PVOID lpContext{ nullptr };
             Attributes sAttributesCurrent{};
             std::vector<Cell> vecCells;
         };
@@ -118,11 +119,18 @@ namespace GuiTerminal
             HRESULT RelocateRegion(_In_ RegionHandle hRegion, _In_ INT iX, _In_ INT iY, _In_ INT iWidth, _In_ INT iHeight) noexcept;
             HRESULT BringRegionToFront(_In_ RegionHandle hRegion) noexcept;
             HRESULT SendRegionToBack(_In_ RegionHandle hRegion) noexcept;
+            HRESULT MoveRegionAfter(_In_ RegionHandle hRegion, _In_opt_ RegionHandle hRegionReference) noexcept;
+            HRESULT SetRegionContext(_In_opt_ RegionHandle hRegion, _In_opt_ PVOID lpContext) noexcept;
+            PVOID GetRegionContext(_In_opt_ RegionHandle hRegion) const noexcept;
+            RegionHandle GetFirstRegion() const noexcept;
+            RegionHandle GetLastRegion() const noexcept;
+            RegionHandle GetNextRegion(_In_opt_ RegionHandle hRegion) const noexcept;
+            RegionHandle GetPreviousRegion(_In_opt_ RegionHandle hRegion) const noexcept;
             VOID GetRegionLocation(_In_ RegionHandle hRegion, _Out_opt_ LPINT lpiX, _Out_opt_ LPINT lpiY, _Out_opt_ LPINT lpiWidth,
                                    _Out_opt_ LPINT lpiHeight) const noexcept;
-            BOOL ConvertToRegionCoordinates(_In_opt_ RegionHandle hRegion, _In_ INT iColTerminal, _In_ INT iRowTerminal,
+            BOOL ConvertToRegionCoordinates(_In_ RegionHandle hRegion, _In_ INT iColTerminal, _In_ INT iRowTerminal,
                                             _Out_opt_ LPINT lpiColRegion, _Out_opt_ LPINT lpiRowRegion) const noexcept;
-            BOOL ConvertFromRegionCoordinates(_In_opt_ RegionHandle hRegion, _In_ INT iColRegion, _In_ INT iRowRegion,
+            BOOL ConvertFromRegionCoordinates(_In_ RegionHandle hRegion, _In_ INT iColRegion, _In_ INT iRowRegion,
                                               _Out_opt_ LPINT lpiColTerminal, _Out_opt_ LPINT lpiRowTerminal) const noexcept;
 
             VOID SaveCursor(_In_opt_ RegionHandle hRegion) noexcept;

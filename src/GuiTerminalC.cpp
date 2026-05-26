@@ -137,6 +137,24 @@ VOID GuiTerminalControl_PrintV(_In_ GuiTerminalControl *lpControl, _In_z_ LPCWST
     }
 }
 
+HRESULT GuiTerminalControl_SetContext(_In_ GuiTerminalControl *lpControl, _In_opt_ PVOID lpContext)
+{
+    if (!lpControl)
+    {
+        return E_POINTER;
+    }
+    return ToCppControl(lpControl)->SetContext(lpContext);
+}
+
+PVOID GuiTerminalControl_GetContext(_In_ const GuiTerminalControl *lpControl)
+{
+    if (!lpControl)
+    {
+        return nullptr;
+    }
+    return ToCppControl(lpControl)->GetContext();
+}
+
 HRESULT GuiTerminalControl_CreateRegion(_In_ GuiTerminalControl *lpControl, _In_ INT iX, _In_ INT iY, _In_ INT iWidth, _In_ INT iHeight,
                                         _Out_ GuiTerminalRegion *lphRegion)
 {
@@ -290,10 +308,75 @@ HRESULT GuiTerminalControl_SendRegionToBack(_In_ GuiTerminalControl *lpControl, 
     return ToCppControl(lpControl)->SendRegionToBack(ToCppRegion(hRegion));
 }
 
-VOID GuiTerminalControl_GetRegionLocation(_In_ GuiTerminalControl *lpControl, _In_opt_  GuiTerminalRegion hRegion, _Out_opt_ LPINT lpiX,
+HRESULT GuiTerminalControl_MoveRegionAfter(_In_ GuiTerminalControl *lpControl, _In_ GuiTerminalRegion hRegion,
+                                           _In_opt_ GuiTerminalRegion hRegionReference)
+{
+    if (!lpControl)
+    {
+        return E_POINTER;
+    }
+    return ToCppControl(lpControl)->MoveRegionAfter(ToCppRegion(hRegion), ToCppRegion(hRegionReference));
+}
+
+HRESULT GuiTerminalControl_SetRegionContext(_In_ GuiTerminalControl *lpControl, _In_opt_ GuiTerminalRegion hRegion,
+                                            _In_opt_ PVOID lpContext)
+{
+    if (!lpControl)
+    {
+        return E_POINTER;
+    }
+    return ToCppControl(lpControl)->SetRegionContext(ToCppRegion(hRegion), lpContext);
+}
+
+PVOID GuiTerminalControl_GetRegionContext(_In_ const GuiTerminalControl *lpControl, _In_opt_ GuiTerminalRegion hRegion)
+{
+    if (!lpControl)
+    {
+        return nullptr;
+    }
+    return ToCppControl(lpControl)->GetRegionContext(ToCppRegion(hRegion));
+}
+
+GuiTerminalRegion GuiTerminalControl_GetFirstRegion(_In_ const GuiTerminalControl *lpControl)
+{
+    if (!lpControl)
+    {
+        return nullptr;
+    }
+    return ToCRegion(ToCppControl(lpControl)->GetFirstRegion());
+}
+
+GuiTerminalRegion GuiTerminalControl_GetLastRegion(_In_ const GuiTerminalControl *lpControl)
+{
+    if (!lpControl)
+    {
+        return nullptr;
+    }
+    return ToCRegion(ToCppControl(lpControl)->GetLastRegion());
+}
+
+GuiTerminalRegion GuiTerminalControl_GetNextRegion(_In_ const GuiTerminalControl *lpControl, _In_opt_ GuiTerminalRegion hRegion)
+{
+    if (!lpControl)
+    {
+        return nullptr;
+    }
+    return ToCRegion(ToCppControl(lpControl)->GetNextRegion(ToCppRegion(hRegion)));
+}
+
+GuiTerminalRegion GuiTerminalControl_GetPreviousRegion(_In_ const GuiTerminalControl *lpControl, _In_opt_ GuiTerminalRegion hRegion)
+{
+    if (!lpControl)
+    {
+        return nullptr;
+    }
+    return ToCRegion(ToCppControl(lpControl)->GetPreviousRegion(ToCppRegion(hRegion)));
+}
+
+VOID GuiTerminalControl_GetRegionLocation(_In_ GuiTerminalControl *lpControl, _In_ GuiTerminalRegion hRegion, _Out_opt_ LPINT lpiX,
                                           _Out_opt_ LPINT lpiY, _Out_opt_ LPINT lpiWidth, _Out_opt_ LPINT lpiHeight)
 {
-    if (lpControl)
+    if (lpControl && hRegion)
     {
         ToCppControl(lpControl)->GetRegionLocation(ToCppRegion(hRegion), lpiX, lpiY, lpiWidth, lpiHeight);
     }
@@ -318,11 +401,30 @@ VOID GuiTerminalControl_GetRegionLocation(_In_ GuiTerminalControl *lpControl, _I
     }
 }
 
-BOOL GuiTerminalControl_ConvertToRegionCoordinates(_In_ GuiTerminalControl *lpControl, _In_opt_ GuiTerminalRegion hRegion,
+VOID GuiTerminalControl_GetTerminalSize(_In_ const GuiTerminalControl *lpControl, _Out_opt_ LPINT lpiCols, _Out_opt_ LPINT lpiRows)
+{
+    if (lpControl)
+    {
+        ToCppControl(lpControl)->GetTerminalSize(lpiCols, lpiRows);
+    }
+    else
+    {
+        if (lpiCols)
+        {
+            *lpiCols = 0;
+        }
+        if (lpiRows)
+        {
+            *lpiRows = 0;
+        }
+    }
+}
+
+BOOL GuiTerminalControl_ConvertToRegionCoordinates(_In_ GuiTerminalControl *lpControl, _In_ GuiTerminalRegion hRegion,
                                                    _In_ INT iColTerminal, _In_ INT iRowTerminal, _Out_opt_ LPINT lpiColRegion,
                                                    _Out_opt_ LPINT lpiRowRegion)
 {
-    if (!lpControl)
+    if (!lpControl || !hRegion)
     {
         if (lpiColRegion)
         {
@@ -339,11 +441,11 @@ BOOL GuiTerminalControl_ConvertToRegionCoordinates(_In_ GuiTerminalControl *lpCo
                                                                lpiRowRegion);
 }
 
-BOOL GuiTerminalControl_ConvertFromRegionCoordinates(_In_ GuiTerminalControl *lpControl, _In_opt_ GuiTerminalRegion hRegion,
+BOOL GuiTerminalControl_ConvertFromRegionCoordinates(_In_ GuiTerminalControl *lpControl, _In_ GuiTerminalRegion hRegion,
                                                      _In_ INT iColRegion, _In_ INT iRowRegion, _Out_opt_ LPINT lpiColTerminal,
                                                      _Out_opt_ LPINT lpiRowTerminal)
 {
-    if (!lpControl)
+    if (!lpControl || !hRegion)
     {
         if (lpiColTerminal)
         {
