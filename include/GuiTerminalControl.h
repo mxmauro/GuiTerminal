@@ -32,6 +32,25 @@ namespace GuiTerminal
             StyleItalic = 1U << 4
         };
 
+        enum StrokeType : DWORD
+        {
+            StrokeSingleLine = 0U,
+            StrokeDoubleLine,
+            StrokeShadeLight,
+            StrokeShadeMedium,
+            StrokeShadeDark,
+            StrokeSolidBlock
+        };
+
+        enum BoxSideFlags : DWORD
+        {
+            BoxSideNone = 0U,
+            BoxSideTopDouble = 1U << 0,
+            BoxSideRightDouble = 1U << 1,
+            BoxSideBottomDouble = 1U << 2,
+            BoxSideLeftDouble = 1U << 3
+        };
+
     private:
         Control() noexcept = default;
     public:
@@ -60,6 +79,15 @@ namespace GuiTerminal
         // Fill an area inside the whole terminal with explicit colors and style flags.
         VOID FillArea(_In_ INT iX, _In_ INT iY, _In_ INT iWidth, _In_ INT iHeight, _In_ WCHAR chCodepointW, _In_ COLORREF crForeground,
                       _In_ COLORREF crBackground, _In_ DWORD dwStyleFlags) noexcept;
+        // Draw a horizontal stroke in the whole terminal.
+        VOID DrawHorizontalLine(_In_ INT iX, _In_ INT iY, _In_ INT iWidth, _In_ StrokeType strokeType, _In_ COLORREF crForeground,
+                                _In_ COLORREF crBackground, _In_ DWORD dwStyleFlags) noexcept;
+        // Draw a vertical stroke in the whole terminal.
+        VOID DrawVerticalLine(_In_ INT iX, _In_ INT iY, _In_ INT iHeight, _In_ StrokeType strokeType, _In_ COLORREF crForeground,
+                              _In_ COLORREF crBackground, _In_ DWORD dwStyleFlags) noexcept;
+        // Draw a box in the whole terminal.
+        VOID DrawBox(_In_ INT iX, _In_ INT iY, _In_ INT iWidth, _In_ INT iHeight, _In_ DWORD dwBoxSideFlags, _In_ COLORREF crForeground,
+                     _In_ COLORREF crBackground, _In_ DWORD dwStyleFlags) noexcept;
 
         // Write UTF-16 text to the default region.
         VOID Write(_In_z_ LPCWSTR szTextW) noexcept;
@@ -83,6 +111,16 @@ namespace GuiTerminal
         VOID FillRegionArea(_In_opt_ RegionHandle hRegion, _In_ INT iX, _In_ INT iY, _In_ INT iWidth, _In_ INT iHeight,
                             _In_ WCHAR chCodepointW, _In_ COLORREF crForeground, _In_ COLORREF crBackground,
                             _In_ DWORD dwStyleFlags) noexcept;
+        // Draw a horizontal stroke in a region.
+        VOID DrawRegionHorizontalLine(_In_opt_ RegionHandle hRegion, _In_ INT iX, _In_ INT iY, _In_ INT iWidth, _In_ StrokeType strokeType,
+                                      _In_ COLORREF crForeground, _In_ COLORREF crBackground, _In_ DWORD dwStyleFlags) noexcept;
+        // Draw a vertical stroke in a region.
+        VOID DrawRegionVerticalLine(_In_opt_ RegionHandle hRegion, _In_ INT iX, _In_ INT iY, _In_ INT iHeight, _In_ StrokeType strokeType,
+                                    _In_ COLORREF crForeground, _In_ COLORREF crBackground, _In_ DWORD dwStyleFlags) noexcept;
+        // Draw a box in a region.
+        VOID DrawRegionBox(_In_opt_ RegionHandle hRegion, _In_ INT iX, _In_ INT iY, _In_ INT iWidth, _In_ INT iHeight,
+                           _In_ DWORD dwBoxSideFlags, _In_ COLORREF crForeground, _In_ COLORREF crBackground,
+                           _In_ DWORD dwStyleFlags) noexcept;
 
         // Write UTF-16 text to a specific region handle.
         VOID WriteRegion(_In_opt_ RegionHandle hRegion, _In_z_ LPCWSTR szTextW) noexcept;
@@ -93,6 +131,10 @@ namespace GuiTerminal
 
         // Relocates the specified region.
         HRESULT RelocateRegion(_In_ RegionHandle hRegion, _In_ INT iX, _In_ INT iY, _In_ INT iWidth, _In_ INT iHeight) noexcept;
+        // Moves the specified region to the top of the z-order.
+        HRESULT BringRegionToFront(_In_ RegionHandle hRegion) noexcept;
+        // Moves the specified region behind all non-root regions.
+        HRESULT SendRegionToBack(_In_ RegionHandle hRegion) noexcept;
 
         // Gets the location of the specified region in cell coordinates.
         VOID GetRegionLocation(_In_opt_ RegionHandle hRegion, _Out_opt_ LPINT lpiX, _Out_opt_ LPINT lpiY, _Out_opt_ LPINT lpiWidth,

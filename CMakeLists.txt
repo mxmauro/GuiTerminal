@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.21)
 
-project(GuiTerminal VERSION 1.0.0 LANGUAGES CXX)
+project(GuiTerminal VERSION 0.6.0 LANGUAGES CXX)
 
 include(CMakePackageConfigHelpers)
 include(GNUInstallDirs)
@@ -8,7 +8,10 @@ include(GNUInstallDirs)
 option(GUITERMINAL_BUILD_DEMO "Build the Win32 demo application" ${PROJECT_IS_TOP_LEVEL})
 
 if(BUILD_SHARED_LIBS AND GUITERMINAL_BUILD_DEMO)
-    message(FATAL_ERROR "GUITERMINAL_BUILD_DEMO requires a static GuiTerminal build. Set GUITERMINAL_BUILD_DEMO=OFF when BUILD_SHARED_LIBS=ON.")
+    message(
+        FATAL_ERROR
+        "GUITERMINAL_BUILD_DEMO requires a static GuiTerminal build. Set GUITERMINAL_BUILD_DEMO=OFF when BUILD_SHARED_LIBS=ON."
+    )
 endif()
 
 set(GUITERMINAL_PUBLIC_HEADERS

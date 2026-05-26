@@ -418,8 +418,9 @@ namespace GuiTerminal::Internals
         }
         iPointerDelta = iPointerCoordinate - iPointerOrigin;
         iOffsetCurrent = iOffsetOrigin +
-                         static_cast<INT>(std::lround((static_cast<FLOAT>(iPointerDelta) / static_cast<FLOAT>(scrollBarMetrics.iThumbTravel)) *
-                                                      static_cast<FLOAT>(scrollBarMetrics.iMaxOffset)));
+                         static_cast<INT>(std::lround(
+                             (static_cast<FLOAT>(iPointerDelta) / static_cast<FLOAT>(scrollBarMetrics.iThumbTravel)) *
+                             static_cast<FLOAT>(scrollBarMetrics.iMaxOffset)));
         if (bVertical != FALSE)
         {
             return SetScrollOffset(m_iScrollOffsetX, iOffsetCurrent);
@@ -559,11 +560,15 @@ namespace GuiTerminal::Internals
         for (INT iStyle = 0; iStyle < 4; ++iStyle)
         {
             m_textFormat[iStyle].Reset();
-            hr = m_dwriteFactory->CreateTextFormat(m_metricsFont.strFontFamilyW.c_str(), nullptr,
-                                                   ((iStyle & 1) == 0) ? DWRITE_FONT_WEIGHT_NORMAL : DWRITE_FONT_WEIGHT_BOLD,
-                                                   ((iStyle & 2) == 0) ? DWRITE_FONT_STYLE_NORMAL : DWRITE_FONT_STYLE_ITALIC, DWRITE_FONT_STRETCH_NORMAL,
-                                                   fFontSizeDips, L"",
-                                                   m_textFormat[iStyle].GetAddressOf());
+            hr = m_dwriteFactory->CreateTextFormat(
+                m_metricsFont.strFontFamilyW.c_str(),
+                nullptr,
+                ((iStyle & 1) == 0) ? DWRITE_FONT_WEIGHT_NORMAL : DWRITE_FONT_WEIGHT_BOLD,
+                ((iStyle & 2) == 0) ? DWRITE_FONT_STYLE_NORMAL : DWRITE_FONT_STYLE_ITALIC,
+                DWRITE_FONT_STRETCH_NORMAL,
+                fFontSizeDips,
+                L"",
+                m_textFormat[iStyle].GetAddressOf());
             if (FAILED(hr))
             {
                 return hr;
@@ -913,7 +918,9 @@ namespace GuiTerminal::Internals
         {
             fUnderlineTop = PixelsToDipsY(rcCell.top + m_metricsFont.iBaselinePx - m_metricsFont.iUnderlineOffsetPx);
             fUnderlineBottom =
-                PixelsToDipsY(rcCell.top + m_metricsFont.iBaselinePx - m_metricsFont.iUnderlineOffsetPx + m_metricsFont.iUnderlineThicknessPx);
+                PixelsToDipsY(rcCell.top + m_metricsFont.iBaselinePx -
+                              m_metricsFont.iUnderlineOffsetPx +
+                              m_metricsFont.iUnderlineThicknessPx);
             rcUnderline = D2D1::RectF(PixelsToDipsX(rcCell.left), fUnderlineTop, PixelsToDipsX(rcCell.right), fUnderlineBottom);
             m_brush->SetColor(ToD2DColor(crForeground));
             m_renderTarget->FillRectangle(rcUnderline, m_brush.Get());

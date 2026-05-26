@@ -1,0 +1,4 @@
+interface:
+  display_name: "GuiTerminal Project"
+  short_description: "Win32 terminal control repo workflow"
+  default_prompt: "Use $guiterminal-project to modify or extend the GuiTerminal repository safely and consistently."

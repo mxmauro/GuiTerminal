@@ -78,6 +78,37 @@ VOID GuiTerminalControl_FillArea(_In_ GuiTerminalControl *lpControl, _In_ INT iX
     }
 }
 
+VOID GuiTerminalControl_DrawHorizontalLine(_In_ GuiTerminalControl *lpControl, _In_ INT iX, _In_ INT iY, _In_ INT iWidth,
+                                           _In_ GuiTerminalStrokeType strokeType, _In_ COLORREF crForeground, _In_ COLORREF crBackground,
+                                           _In_ DWORD dwStyleFlags)
+{
+    if (lpControl)
+    {
+        ToCppControl(lpControl)->DrawHorizontalLine(iX, iY, iWidth, static_cast<GuiTerminal::Control::StrokeType>(strokeType), crForeground,
+                                                    crBackground, dwStyleFlags);
+    }
+}
+
+VOID GuiTerminalControl_DrawVerticalLine(_In_ GuiTerminalControl *lpControl, _In_ INT iX, _In_ INT iY, _In_ INT iHeight,
+                                         _In_ GuiTerminalStrokeType strokeType, _In_ COLORREF crForeground, _In_ COLORREF crBackground,
+                                         _In_ DWORD dwStyleFlags)
+{
+    if (lpControl)
+    {
+        ToCppControl(lpControl)->DrawVerticalLine(iX, iY, iHeight, static_cast<GuiTerminal::Control::StrokeType>(strokeType), crForeground,
+                                                  crBackground, dwStyleFlags);
+    }
+}
+
+VOID GuiTerminalControl_DrawBox(_In_ GuiTerminalControl *lpControl, _In_ INT iX, _In_ INT iY, _In_ INT iWidth, _In_ INT iHeight,
+                                _In_ DWORD dwBoxSideFlags, _In_ COLORREF crForeground, _In_ COLORREF crBackground, _In_ DWORD dwStyleFlags)
+{
+    if (lpControl)
+    {
+        ToCppControl(lpControl)->DrawBox(iX, iY, iWidth, iHeight, dwBoxSideFlags, crForeground, crBackground, dwStyleFlags);
+    }
+}
+
 VOID GuiTerminalControl_Write(_In_ GuiTerminalControl *lpControl, _In_z_ LPCWSTR szTextW)
 {
     if (lpControl)
@@ -166,6 +197,42 @@ VOID GuiTerminalControl_FillRegionArea(_In_ GuiTerminalControl *lpControl, _In_ 
     }
 }
 
+VOID GuiTerminalControl_DrawRegionHorizontalLine(_In_ GuiTerminalControl *lpControl, _In_ GuiTerminalRegion hRegion, _In_ INT iX,
+                                                 _In_ INT iY, _In_ INT iWidth,
+                                                 _In_ GuiTerminalStrokeType strokeType, _In_ COLORREF crForeground,
+                                                 _In_ COLORREF crBackground, _In_ DWORD dwStyleFlags)
+{
+    if (lpControl)
+    {
+        ToCppControl(lpControl)->DrawRegionHorizontalLine(ToCppRegion(hRegion), iX, iY, iWidth,
+                                                          static_cast<GuiTerminal::Control::StrokeType>(strokeType), crForeground,
+                                                          crBackground, dwStyleFlags);
+    }
+}
+
+VOID GuiTerminalControl_DrawRegionVerticalLine(_In_ GuiTerminalControl *lpControl, _In_ GuiTerminalRegion hRegion, _In_ INT iX, _In_ INT iY,
+                                               _In_ INT iHeight, _In_ GuiTerminalStrokeType strokeType, _In_ COLORREF crForeground,
+                                               _In_ COLORREF crBackground, _In_ DWORD dwStyleFlags)
+{
+    if (lpControl)
+    {
+        ToCppControl(lpControl)->DrawRegionVerticalLine(ToCppRegion(hRegion), iX, iY, iHeight,
+                                                        static_cast<GuiTerminal::Control::StrokeType>(strokeType), crForeground,
+                                                        crBackground, dwStyleFlags);
+    }
+}
+
+VOID GuiTerminalControl_DrawRegionBox(_In_ GuiTerminalControl *lpControl, _In_ GuiTerminalRegion hRegion, _In_ INT iX, _In_ INT iY,
+                                      _In_ INT iWidth, _In_ INT iHeight, _In_ DWORD dwBoxSideFlags, _In_ COLORREF crForeground,
+                                      _In_ COLORREF crBackground, _In_ DWORD dwStyleFlags)
+{
+    if (lpControl)
+    {
+        ToCppControl(lpControl)->DrawRegionBox(ToCppRegion(hRegion), iX, iY, iWidth, iHeight, dwBoxSideFlags, crForeground, crBackground,
+                                               dwStyleFlags);
+    }
+}
+
 VOID GuiTerminalControl_WriteRegion(_In_ GuiTerminalControl *lpControl, _In_ GuiTerminalRegion hRegion, _In_z_ LPCWSTR szTextW)
 {
     if (lpControl)
@@ -203,6 +270,24 @@ HRESULT GuiTerminalControl_RelocateRegion(_In_ GuiTerminalControl *lpControl, _I
         return E_POINTER;
     }
     return ToCppControl(lpControl)->RelocateRegion(ToCppRegion(hRegion), iX, iY, iWidth, iHeight);
+}
+
+HRESULT GuiTerminalControl_BringRegionToFront(_In_ GuiTerminalControl *lpControl, _In_ GuiTerminalRegion hRegion)
+{
+    if (!lpControl)
+    {
+        return E_POINTER;
+    }
+    return ToCppControl(lpControl)->BringRegionToFront(ToCppRegion(hRegion));
+}
+
+HRESULT GuiTerminalControl_SendRegionToBack(_In_ GuiTerminalControl *lpControl, _In_ GuiTerminalRegion hRegion)
+{
+    if (!lpControl)
+    {
+        return E_POINTER;
+    }
+    return ToCppControl(lpControl)->SendRegionToBack(ToCppRegion(hRegion));
 }
 
 VOID GuiTerminalControl_GetRegionLocation(_In_ GuiTerminalControl *lpControl, _In_opt_  GuiTerminalRegion hRegion, _Out_opt_ LPINT lpiX,

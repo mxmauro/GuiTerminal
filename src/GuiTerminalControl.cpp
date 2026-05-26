@@ -242,6 +242,31 @@ namespace GuiTerminal
         }
     }
 
+    VOID Control::DrawHorizontalLine(_In_ INT iX, _In_ INT iY, _In_ INT iWidth, _In_ StrokeType strokeType, _In_ COLORREF crForeground,
+                                     _In_ COLORREF crBackground, _In_ DWORD dwStyleFlags) noexcept
+    {
+        std::lock_guard<std::mutex> lockGuard(m_mutex);
+
+        m_sBuffer.DrawHorizontalLine(nullptr, iX, iY, iWidth, strokeType, crForeground, crBackground, dwStyleFlags);
+    }
+
+    VOID Control::DrawVerticalLine(_In_ INT iX, _In_ INT iY, _In_ INT iHeight, _In_ StrokeType strokeType, _In_ COLORREF crForeground,
+                                   _In_ COLORREF crBackground, _In_ DWORD dwStyleFlags) noexcept
+    {
+        std::lock_guard<std::mutex> lockGuard(m_mutex);
+
+        m_sBuffer.DrawVerticalLine(nullptr, iX, iY, iHeight, strokeType, crForeground, crBackground, dwStyleFlags);
+    }
+
+    VOID Control::DrawBox(_In_ INT iX, _In_ INT iY, _In_ INT iWidth, _In_ INT iHeight, _In_ DWORD dwBoxSideFlags,
+                          _In_ COLORREF crForeground, _In_ COLORREF crBackground,
+                          _In_ DWORD dwStyleFlags) noexcept
+    {
+        std::lock_guard<std::mutex> lockGuard(m_mutex);
+
+        m_sBuffer.DrawBox(nullptr, iX, iY, iWidth, iHeight, dwBoxSideFlags, crForeground, crBackground, dwStyleFlags);
+    }
+
     VOID Control::Write(_In_z_ LPCWSTR szTextW) noexcept
     {
         std::lock_guard<std::mutex> lockGuard(m_mutex);
@@ -335,6 +360,33 @@ namespace GuiTerminal
         }
     }
 
+    VOID Control::DrawRegionHorizontalLine(_In_opt_ RegionHandle hRegion, _In_ INT iX, _In_ INT iY, _In_ INT iWidth,
+                                           _In_ StrokeType strokeType, _In_ COLORREF crForeground, _In_ COLORREF crBackground,
+                                           _In_ DWORD dwStyleFlags) noexcept
+    {
+        std::lock_guard<std::mutex> lockGuard(m_mutex);
+
+        m_sBuffer.DrawHorizontalLine(hRegion, iX, iY, iWidth, strokeType, crForeground, crBackground, dwStyleFlags);
+    }
+
+    VOID Control::DrawRegionVerticalLine(_In_opt_ RegionHandle hRegion, _In_ INT iX, _In_ INT iY, _In_ INT iHeight,
+                                         _In_ StrokeType strokeType, _In_ COLORREF crForeground, _In_ COLORREF crBackground,
+                                         _In_ DWORD dwStyleFlags) noexcept
+    {
+        std::lock_guard<std::mutex> lockGuard(m_mutex);
+
+        m_sBuffer.DrawVerticalLine(hRegion, iX, iY, iHeight, strokeType, crForeground, crBackground, dwStyleFlags);
+    }
+
+    VOID Control::DrawRegionBox(_In_opt_ RegionHandle hRegion, _In_ INT iX, _In_ INT iY, _In_ INT iWidth, _In_ INT iHeight,
+                                _In_ DWORD dwBoxSideFlags, _In_ COLORREF crForeground, _In_ COLORREF crBackground,
+                                _In_ DWORD dwStyleFlags) noexcept
+    {
+        std::lock_guard<std::mutex> lockGuard(m_mutex);
+
+        m_sBuffer.DrawBox(hRegion, iX, iY, iWidth, iHeight, dwBoxSideFlags, crForeground, crBackground, dwStyleFlags);
+    }
+
     VOID Control::WriteRegion(_In_opt_ RegionHandle hRegion, _In_z_ LPCWSTR szTextW) noexcept
     {
         std::lock_guard<std::mutex> lockGuard(m_mutex);
@@ -390,6 +442,28 @@ namespace GuiTerminal
             return E_INVALIDARG;
         }
         return m_sBuffer.RelocateRegion(hRegion, iX, iY, iWidth, iHeight);
+    }
+
+    HRESULT Control::BringRegionToFront(_In_ RegionHandle hRegion) noexcept
+    {
+        std::lock_guard<std::mutex> lockGuard(m_mutex);
+
+        if (!hRegion)
+        {
+            return E_POINTER;
+        }
+        return m_sBuffer.BringRegionToFront(hRegion);
+    }
+
+    HRESULT Control::SendRegionToBack(_In_ RegionHandle hRegion) noexcept
+    {
+        std::lock_guard<std::mutex> lockGuard(m_mutex);
+
+        if (!hRegion)
+        {
+            return E_POINTER;
+        }
+        return m_sBuffer.SendRegionToBack(hRegion);
     }
 
     VOID Control::GetRegionLocation(_In_opt_ RegionHandle hRegion, _Out_opt_ LPINT lpiX, _Out_opt_ LPINT lpiY, _Out_opt_ LPINT lpiWidth,

@@ -29,7 +29,7 @@ git clone C:\Fuentes\VSNet\VCPkgRegistry $tempRegistry
   -RegistryPath $tempRegistry `
   -RegistryKind Git `
   -SourceMode LocalSource `
-  -Version 1.1.0 `
+  -Version 0.6.0 `
   -SourcePath C:\Fuentes\VSNet\Libraries\GuiTerminal
 ```
 
@@ -53,8 +53,8 @@ Remove-Item -Recurse -Force $tempRegistry
 
 ```powershell
 git push origin main
-git tag v1.1.0
-git push origin v1.1.0
+git tag v0.6.0
+git push origin v0.6.0
 ```
 
 2. Generate registry metadata in the real registry clone using the pushed tag.
@@ -64,8 +64,8 @@ git push origin v1.1.0
   -RegistryPath C:\Fuentes\VSNet\VCPkgRegistry `
   -RegistryKind Git `
   -SourceMode GitHub `
-  -Version 1.1.0 `
-  -SourceRef v1.1.0 `
+  -Version 0.6.0 `
+  -SourceRef v0.6.0 `
   -GitHubRepository mxmauro/GuiTerminal
 ```
 
@@ -80,13 +80,14 @@ git -C C:\Fuentes\VSNet\VCPkgRegistry diff
 
 ```powershell
 git -C C:\Fuentes\VSNet\VCPkgRegistry add ports versions
-git -C C:\Fuentes\VSNet\VCPkgRegistry commit -m "Add guiterminal 1.1.0"
+git -C C:\Fuentes\VSNet\VCPkgRegistry commit -m "Add guiterminal 0.6.0"
 git -C C:\Fuentes\VSNet\VCPkgRegistry push origin main
 ```
 
 ## Tag notes
 
-GitHub Actions tag filters use glob patterns, not full regex, so the workflow triggers on tags beginning with `v` and then validates the tag in PowerShell with:
+GitHub Actions tag filters use glob patterns, not full regex, so the workflow triggers on
+tags beginning with `v` and then validates the tag in PowerShell with:
 
 ```regex
 ^v\d+\.\d+\.\d+(-[a-zA-Z0-9][a-zA-Z0-9.\-]*)?$

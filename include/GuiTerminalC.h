@@ -27,6 +27,25 @@ enum GuiTerminalStyleFlags
     GuiTerminalStyleItalic = 1U << 4
 };
 
+enum GuiTerminalStrokeType
+{
+    GuiTerminalStrokeSingleLine = 0U,
+    GuiTerminalStrokeDoubleLine,
+    GuiTerminalStrokeShadeLight,
+    GuiTerminalStrokeShadeMedium,
+    GuiTerminalStrokeShadeDark,
+    GuiTerminalStrokeSolidBlock
+};
+
+enum GuiTerminalBoxSideFlags
+{
+    GuiTerminalBoxSideNone = 0U,
+    GuiTerminalBoxSideTopDouble = 1U << 0,
+    GuiTerminalBoxSideRightDouble = 1U << 1,
+    GuiTerminalBoxSideBottomDouble = 1U << 2,
+    GuiTerminalBoxSideLeftDouble = 1U << 3
+};
+
 typedef struct GuiTerminalControlConfig
 {
     INT iRows;
@@ -60,6 +79,17 @@ GUITERMINAL_CONTROL_API
 VOID GuiTerminalControl_FillArea(_In_ GuiTerminalControl* lpControl, _In_ INT iX, _In_ INT iY, _In_ INT iWidth, _In_ INT iHeight,
                                  _In_ WCHAR chCodepointW, _In_ COLORREF crForeground, _In_ COLORREF crBackground, _In_ DWORD dwStyleFlags);
 GUITERMINAL_CONTROL_API
+VOID GuiTerminalControl_DrawHorizontalLine(_In_ GuiTerminalControl* lpControl, _In_ INT iX, _In_ INT iY, _In_ INT iWidth,
+                                           _In_ GuiTerminalStrokeType strokeType, _In_ COLORREF crForeground, _In_ COLORREF crBackground,
+                                           _In_ DWORD dwStyleFlags);
+GUITERMINAL_CONTROL_API
+VOID GuiTerminalControl_DrawVerticalLine(_In_ GuiTerminalControl* lpControl, _In_ INT iX, _In_ INT iY, _In_ INT iHeight,
+                                         _In_ GuiTerminalStrokeType strokeType, _In_ COLORREF crForeground, _In_ COLORREF crBackground,
+                                         _In_ DWORD dwStyleFlags);
+GUITERMINAL_CONTROL_API
+VOID GuiTerminalControl_DrawBox(_In_ GuiTerminalControl* lpControl, _In_ INT iX, _In_ INT iY, _In_ INT iWidth, _In_ INT iHeight,
+                                _In_ DWORD dwBoxSideFlags, _In_ COLORREF crForeground, _In_ COLORREF crBackground, _In_ DWORD dwStyleFlags);
+GUITERMINAL_CONTROL_API
 VOID GuiTerminalControl_Write(_In_ GuiTerminalControl* lpControl, _In_z_ LPCWSTR szTextW);
 GUITERMINAL_CONTROL_API
 VOID GuiTerminalControl_Print(_In_ GuiTerminalControl* lpControl, _In_z_ LPCWSTR szFormatW, ...);
@@ -80,6 +110,18 @@ VOID GuiTerminalControl_FillRegionArea(_In_ GuiTerminalControl* lpControl, _In_ 
                                        _In_ INT iWidth, _In_ INT iHeight, _In_ WCHAR chCodepointW, _In_ COLORREF crForeground,
                                        _In_ COLORREF crBackground, _In_ DWORD dwStyleFlags);
 GUITERMINAL_CONTROL_API
+VOID GuiTerminalControl_DrawRegionHorizontalLine(_In_ GuiTerminalControl* lpControl, _In_ GuiTerminalRegion hRegion, _In_ INT iX,
+                                                 _In_ INT iY, _In_ INT iWidth, _In_ GuiTerminalStrokeType strokeType,
+                                                 _In_ COLORREF crForeground, _In_ COLORREF crBackground, _In_ DWORD dwStyleFlags);
+GUITERMINAL_CONTROL_API
+VOID GuiTerminalControl_DrawRegionVerticalLine(_In_ GuiTerminalControl* lpControl, _In_ GuiTerminalRegion hRegion, _In_ INT iX, _In_ INT iY,
+                                               _In_ INT iHeight, _In_ GuiTerminalStrokeType strokeType, _In_ COLORREF crForeground,
+                                               _In_ COLORREF crBackground, _In_ DWORD dwStyleFlags);
+GUITERMINAL_CONTROL_API
+VOID GuiTerminalControl_DrawRegionBox(_In_ GuiTerminalControl* lpControl, _In_ GuiTerminalRegion hRegion, _In_ INT iX, _In_ INT iY,
+                                      _In_ INT iWidth, _In_ INT iHeight, _In_ DWORD dwBoxSideFlags, _In_ COLORREF crForeground,
+                                      _In_ COLORREF crBackground, _In_ DWORD dwStyleFlags);
+GUITERMINAL_CONTROL_API
 VOID GuiTerminalControl_WriteRegion(_In_ GuiTerminalControl* lpControl, _In_ GuiTerminalRegion hRegion, _In_z_ LPCWSTR szTextW);
 GUITERMINAL_CONTROL_API
 VOID GuiTerminalControl_PrintRegion(_In_ GuiTerminalControl* lpControl, _In_ GuiTerminalRegion hRegion, _In_z_ LPCWSTR szFormatW, ...);
@@ -90,6 +132,10 @@ VOID GuiTerminalControl_PrintRegionV(_In_ GuiTerminalControl *lpControl, _In_ Gu
 GUITERMINAL_CONTROL_API
 HRESULT GuiTerminalControl_RelocateRegion(_In_ GuiTerminalControl *lpControl, _In_ GuiTerminalRegion hRegion, _In_ INT iX, _In_ INT iY,
                                           _In_ INT iWidth, _In_ INT iHeight);
+GUITERMINAL_CONTROL_API
+HRESULT GuiTerminalControl_BringRegionToFront(_In_ GuiTerminalControl *lpControl, _In_ GuiTerminalRegion hRegion);
+GUITERMINAL_CONTROL_API
+HRESULT GuiTerminalControl_SendRegionToBack(_In_ GuiTerminalControl *lpControl, _In_ GuiTerminalRegion hRegion);
 GUITERMINAL_CONTROL_API
 VOID GuiTerminalControl_GetRegionLocation(_In_ GuiTerminalControl *lpControl, _In_opt_  GuiTerminalRegion hRegion, _Out_opt_ LPINT lpiX,
                                           _Out_opt_ LPINT lpiY, _Out_opt_ LPINT lpiWidth, _Out_opt_ LPINT lpiHeight);

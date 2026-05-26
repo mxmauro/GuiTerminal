@@ -3,7 +3,9 @@
 ## Scope
 - These instructions apply to the whole repository.
 - Follow the existing Windows-first C++ style instead of introducing generic cross-platform conventions.
-- Preserve the current architecture: public headers in `include/`, implementation in `src/`, demo code in `demo/`, build and packaging files at the repo root, `cmake/`, `scripts/`, and `vcpkg/`.
+- Preserve the current architecture: public headers in `include/`, implementation in `src/`,
+  demo code in `demo/`, build and packaging files at the repo root, `cmake/`, `scripts/`,
+  and `vcpkg/`.
 
 ## File format
 - Use CRLF line endings for text files. This repository enforces CRLF in `.gitattributes`, and `utils/fixeol.bat` exists to normalize files.
@@ -12,7 +14,9 @@
 
 ## General coding style
 - Indent with 4 spaces in handwritten code.
-- Avoid tabs in handwritten files. If a file is already generator-produced or consistently tab-aligned throughout, leave that style in place instead of normalizing it opportunistically.
+- Avoid tabs in handwritten files. If a file is already generator-produced or consistently
+  tab-aligned throughout, leave that style in place instead of normalizing it opportunistically.
+- Keep lines at or below 140 characters when practical. Split long statements and parameter lists for readability.
 - Use braces on their own lines for namespaces, classes, structs, functions, and control-flow blocks.
 - Keep a blank line between logical sections, but avoid excessive vertical whitespace.
 - Use the existing separator comment style when it helps structure a file:
@@ -25,16 +29,23 @@
 - Avoid style-only rewrites. Match the surrounding file instead of normalizing unrelated formatting.
 
 ## C++ and Win32 conventions
-- This codebase is Windows-native. Prefer Win32 and COM-style types and APIs where the project already uses them: `HRESULT`, `BOOL`, `VOID`, `INT`, `DWORD`, `COLORREF`, `HWND`, `RECT`, `SIZE`.
+- This codebase is Windows-native. Prefer Win32 and COM-style types and APIs where the
+  project already uses them: `HRESULT`, `BOOL`, `VOID`, `INT`, `DWORD`, `COLORREF`, `HWND`,
+  `RECT`, `SIZE`.
 - Use `WIN32_LEAN_AND_MEAN` before including `windows.h` in headers and source files that need it.
 - Prefer wide-character Win32 APIs and wide string literals: `CreateWindowExW`, `L"..."`, `WCHAR`, `LPCWSTR`.
-- Keep SAL annotations on public and internal APIs when touching signatures: `_In_`, `_Out_`, `_In_opt_`, `_Out_opt_`, `_In_z_`, `_In_reads_(...)`, etc.
-- Continue returning Win32-style error codes. Use `E_POINTER`, `E_INVALIDARG`, `E_OUTOFMEMORY`, `E_UNEXPECTED`, `HRESULT_FROM_WIN32(...)`, and `SUCCEEDED` / `FAILED` as appropriate.
+- Keep SAL annotations on public and internal APIs when touching signatures: `_In_`, `_Out_`,
+  `_In_opt_`, `_Out_opt_`, `_In_z_`, `_In_reads_(...)`, etc.
+- Continue returning Win32-style error codes. Use `E_POINTER`, `E_INVALIDARG`,
+  `E_OUTOFMEMORY`, `E_UNEXPECTED`, `HRESULT_FROM_WIN32(...)`, and `SUCCEEDED` / `FAILED`
+  as appropriate.
 - Use `TRUE` / `FALSE` for `BOOL` values and `nullptr` for pointers.
 
 ## Naming
 - Types, classes, structs, enums, namespaces, and methods use PascalCase: `Buffer`, `CursorState`, `CreateRegion`, `GuiTerminal::Internals`.
-- The C API uses the exported prefix form already established in `include/GuiTerminalC.h`: `GuiTerminalControl_Create`, `GuiTerminalControl_WriteRegion`, etc.
+- The C API uses the exported prefix form already established in
+  `include/GuiTerminalC.h`: `GuiTerminalControl_Create`, `GuiTerminalControl_WriteRegion`,
+  etc.
 - Macros use all caps with underscores: `TERMINAL_COLS`, `WINDOW_CLASS_NAME`.
 - Follow the existing Hungarian-style prefixes for variables and fields. Common examples in this repo:
 - `i` for signed integers: `iRows`, `iCursorX`
@@ -54,10 +65,15 @@
 
 ## Layout and declarations
 - Keep local includes first, then standard library headers.
-- Internal project includes in `.cpp` files currently use quoted relative Windows paths such as `"..\\include\\GuiTerminalBuffer.h"`. Match the surrounding file instead of restyling include paths.
-- File-local helper declarations should stay `static` and appear near the top of the translation unit before the main namespace or function bodies.
+- Internal project includes in `.cpp` files currently use quoted relative Windows paths such as
+  `"..\\include\\GuiTerminalBuffer.h"`. Match the surrounding file instead of restyling
+  include paths.
+- File-local helper declarations should stay `static` and appear near the top of the
+  translation unit before the main namespace or function bodies.
 - Prefer explicit types over `auto`.
-- Exception: `auto` is acceptable for iterator-style loops, `if`/`switch` init-statements, and similar cases where the deduced type is obvious and the alternative is noisier, matching existing patterns such as `for (const auto& ...)` and `if (auto it = ...; ...)`.
+- Exception: `auto` is acceptable for iterator-style loops, `if`/`switch` init-statements,
+  and similar cases where the deduced type is obvious and the alternative is noisier,
+  matching existing patterns such as `for (const auto& ...)` and `if (auto it = ...; ...)`.
 - Initialize variables explicitly, often at declaration time or immediately before first use:
 
 ```cpp
@@ -69,13 +85,20 @@ sConfig = GuiTerminal::Control::Config{};
 ```
 
 - Keep long parameter lists split across lines with the continuation aligned for readability, matching the current style.
+- When wrapping declarations, calls, or expressions, fill each line as much as practical up to the
+  140-character limit instead of using one-argument-per-line formatting unless readability clearly
+  requires it.
 
 ## Control flow and implementation patterns
 - Prefer early returns for argument validation and failure paths.
-- When a function accepts optional handles or pointers, follow the established normalization pattern, for example defaulting a null region handle to the root region.
+- When a function accepts optional handles or pointers, follow the established normalization
+  pattern, for example defaulting a null region handle to the root region.
 - Preserve the existing `switch` formatting with `case` labels indented inside the block and `break;` on its own line.
-- Use standard-library helpers exactly as this codebase already does when macro collisions are possible, for example `(std::min)(...)` and `(std::max)(...)`.
-- Keep exception handling narrow and compatibility-focused. Where the code catches allocation failures, continue mapping `std::bad_alloc` to `E_OUTOFMEMORY` and unexpected exceptions to `E_UNEXPECTED`.
+- Use standard-library helpers exactly as this codebase already does when macro collisions are
+  possible, for example `(std::min)(...)` and `(std::max)(...)`.
+- Keep exception handling narrow and compatibility-focused. Where the code catches allocation
+  failures, continue mapping `std::bad_alloc` to `E_OUTOFMEMORY` and unexpected exceptions
+  to `E_UNEXPECTED`.
 
 ## Expression parentheses
 - Use parentheses to clarify precedence, not mechanically around every subexpression.
@@ -83,7 +106,8 @@ sConfig = GuiTerminal::Control::Config{};
 - Add parentheses when mixing `&&` and `||` in the same expression.
 - Add parentheses when a unary operator such as `!` applies to only part of a larger expression and the scope could be misread.
 - Prefer `if ((!ptr) || (*ptr == 0))` over `if (!ptr || *ptr == 0)` when the grouped intent is clearer.
-- Prefer `return ((a && b) || (c && d)) ? TRUE : FALSE;` over `return (a && b || c && d) ? TRUE : FALSE;` when mixed boolean operators are involved.
+- Prefer `return ((a && b) || (c && d)) ? TRUE : FALSE;` over
+  `return (a && b || c && d) ? TRUE : FALSE;` when mixed boolean operators are involved.
 - Do not add extra grouping that does not improve readability.
 
 ## Headers and API surface

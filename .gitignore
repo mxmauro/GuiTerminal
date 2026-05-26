@@ -8,6 +8,9 @@
 *.log
 *.obj
 *.ilk
+/.codex/*
+!/.codex/skills/
+!/.codex/skills/**
 /.vs/
 /bin/
 /build/
