@@ -85,6 +85,9 @@ namespace GuiTerminal
             VOID DrawCells(_In_ const Buffer::Snapshot& sSnapshotBuffer) noexcept;
             VOID DrawCell(_In_ const Buffer::Cell& sCellCurrent, _In_ INT iCol, _In_ INT iRow,
                           _In_ const Buffer::Snapshot& sSnapshotBuffer) noexcept;
+            VOID DrawCursor(_In_ const Buffer::Snapshot& sSnapshotBuffer) noexcept;
+            VOID DrawGlyph(_In_ WCHAR chCodepointW, _In_ DWORD dwStyleFlags, _In_ COLORREF crForeground,
+                           _In_ const D2D1_RECT_F& rcText) noexcept;
 
         private:
             HWND m_hWnd{};

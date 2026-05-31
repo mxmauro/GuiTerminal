@@ -4,6 +4,7 @@
 #include "GuiTerminalRenderer.h"
 #include <cstdarg>
 #include <mutex>
+#include <thread>
 
 // -----------------------------------------------------------------------------
 
@@ -51,6 +52,13 @@ namespace GuiTerminal
             BoxSideLeftDouble = 1U << 3
         };
 
+        enum CursorStyle : DWORD
+        {
+            CursorBlock = 0U,
+            CursorUnderscore,
+            CursorBarLeft
+        };
+
     private:
         Control() noexcept = default;
     public:
@@ -79,6 +87,9 @@ namespace GuiTerminal
         // Fill an area inside the whole terminal with explicit colors and style flags.
         VOID FillArea(_In_ INT iX, _In_ INT iY, _In_ INT iWidth, _In_ INT iHeight, _In_ WCHAR chCodepointW, _In_ COLORREF crForeground,
                       _In_ COLORREF crBackground, _In_ DWORD dwStyleFlags) noexcept;
+        // Move an area inside the whole terminal and fill the vacated cells with the provided character and attributes.
+        VOID Move(_In_ INT iSourceX, _In_ INT iSourceY, _In_ INT iWidth, _In_ INT iHeight, _In_ INT iTargetX, _In_ INT iTargetY,
+                  _In_ WCHAR chFillW, _In_ COLORREF crForeground, _In_ COLORREF crBackground, _In_ DWORD dwStyleFlags) noexcept;
         // Draw a horizontal stroke in the whole terminal.
         VOID DrawHorizontalLine(_In_ INT iX, _In_ INT iY, _In_ INT iWidth, _In_ StrokeType strokeType, _In_ COLORREF crForeground,
                                 _In_ COLORREF crBackground, _In_ DWORD dwStyleFlags) noexcept;
@@ -100,8 +111,9 @@ namespace GuiTerminal
         // Returns the context pointer associated with the default region.
         PVOID GetContext() const noexcept;
 
-        // Create a region inside the terminal in cell coordinates.
-        HRESULT CreateRegion(_In_ INT iX, _In_ INT iY, _In_ INT iWidth, _In_ INT iHeight, _Out_ RegionHandle* lphRegion) noexcept;
+        // Create a region in cell coordinates relative to the specified parent, or the terminal when the parent is null.
+        HRESULT CreateRegion(_In_ INT iX, _In_ INT iY, _In_ INT iWidth, _In_ INT iHeight, _Out_ RegionHandle* lphRegion,
+                             _In_opt_ RegionHandle hRegionParent = nullptr) noexcept;
         // Destroy a created region handle.
         VOID DestroyRegion(_In_ RegionHandle hRegion) noexcept;
 
@@ -115,6 +127,10 @@ namespace GuiTerminal
         VOID FillRegionArea(_In_opt_ RegionHandle hRegion, _In_ INT iX, _In_ INT iY, _In_ INT iWidth, _In_ INT iHeight,
                             _In_ WCHAR chCodepointW, _In_ COLORREF crForeground, _In_ COLORREF crBackground,
                             _In_ DWORD dwStyleFlags) noexcept;
+        // Move an area inside a region and fill the vacated cells with the provided character and attributes.
+        VOID MoveRegion(_In_opt_ RegionHandle hRegion, _In_ INT iSourceX, _In_ INT iSourceY, _In_ INT iWidth, _In_ INT iHeight,
+                        _In_ INT iTargetX, _In_ INT iTargetY, _In_ WCHAR chFillW, _In_ COLORREF crForeground,
+                        _In_ COLORREF crBackground, _In_ DWORD dwStyleFlags) noexcept;
         // Draw a horizontal stroke in a region.
         VOID DrawRegionHorizontalLine(_In_opt_ RegionHandle hRegion, _In_ INT iX, _In_ INT iY, _In_ INT iWidth, _In_ StrokeType strokeType,
                                       _In_ COLORREF crForeground, _In_ COLORREF crBackground, _In_ DWORD dwStyleFlags) noexcept;
@@ -135,11 +151,11 @@ namespace GuiTerminal
 
         // Relocates the specified region.
         HRESULT RelocateRegion(_In_ RegionHandle hRegion, _In_ INT iX, _In_ INT iY, _In_ INT iWidth, _In_ INT iHeight) noexcept;
-        // Moves the specified region to the top of the z-order.
+        // Moves the specified region to the top of its sibling z-order.
         HRESULT BringRegionToFront(_In_ RegionHandle hRegion) noexcept;
-        // Moves the specified region behind all non-root regions.
+        // Moves the specified region behind its sibling regions.
         HRESULT SendRegionToBack(_In_ RegionHandle hRegion) noexcept;
-        // Moves the specified region immediately after the reference region, or to the top when the reference handle is null.
+        // Moves the specified region immediately after the reference sibling, or to the top when the reference handle is null.
         HRESULT MoveRegionAfter(_In_ RegionHandle hRegion, _In_opt_ RegionHandle hRegionReference) noexcept;
         // Associates a context pointer with the specified region, or the default region when the handle is null.
         HRESULT SetRegionContext(_In_opt_ RegionHandle hRegion, _In_opt_ PVOID lpContext) noexcept;
@@ -149,24 +165,39 @@ namespace GuiTerminal
         RegionHandle GetFirstRegion() const noexcept;
         // Returns the backmost non-root region, or null when no created regions exist.
         RegionHandle GetLastRegion() const noexcept;
-        // Returns the next region toward the back, or the first region when the handle is null.
+        // Returns the next region toward the back within the same sibling list, or the first root child when the handle is null.
         RegionHandle GetNextRegion(_In_opt_ RegionHandle hRegion) const noexcept;
-        // Returns the previous region toward the front, or the last region when the handle is null.
+        // Returns the previous region toward the front within the same sibling list, or the last root child when the handle is null.
         RegionHandle GetPreviousRegion(_In_opt_ RegionHandle hRegion) const noexcept;
+        // Returns the frontmost child of the specified parent, or the frontmost root child when the handle is null.
+        RegionHandle GetChildFirstRegion(_In_opt_ RegionHandle hRegionParent) const noexcept;
+        // Returns the backmost child of the specified parent, or the backmost root child when the handle is null.
+        RegionHandle GetChildLastRegion(_In_opt_ RegionHandle hRegionParent) const noexcept;
+        // Returns the immediate parent region, or null when the parent is the terminal root.
+        RegionHandle GetParentRegion(_In_ RegionHandle hRegion) const noexcept;
 
-        // Gets the location of the specified region in cell coordinates.
+        // Gets the location of the specified region in cell coordinates relative to its immediate parent.
         VOID GetRegionLocation(_In_ RegionHandle hRegion, _Out_opt_ LPINT lpiX, _Out_opt_ LPINT lpiY, _Out_opt_ LPINT lpiWidth,
                                _Out_opt_ LPINT lpiHeight) const noexcept;
         // Return the current terminal grid size in cells.
         VOID GetTerminalSize(_Out_opt_ LPINT lpiCols, _Out_opt_ LPINT lpiRows) const noexcept;
 
-        // Convert zero-based terminal coordinates to zero-based region coordinates for a specific region.
+        // Translate zero-based terminal coordinates to zero-based region coordinates for a specific region.
+        // Returns FALSE only when the region handle is invalid.
         BOOL ConvertToRegionCoordinates(_In_ RegionHandle hRegion, _In_ INT iColTerminal, _In_ INT iRowTerminal,
                                         _Out_opt_ LPINT lpiColRegion, _Out_opt_ LPINT lpiRowRegion) const noexcept;
 
-        // Convert zero-based region coordinates to zero-based terminal coordinates for a specific region.
+        // Translate zero-based region coordinates to zero-based terminal coordinates for a specific region.
+        // Returns FALSE when the region handle is invalid or the translated result cannot fit in INT.
         BOOL ConvertFromRegionCoordinates(_In_ RegionHandle hRegion, _In_ INT iColRegion, _In_ INT iRowRegion,
                                           _Out_opt_ LPINT lpiColTerminal, _Out_opt_ LPINT lpiRowTerminal) const noexcept;
+
+        // Show the cursor for the specified region, or the root terminal cursor when the handle is null.
+        VOID ShowCursor(_In_opt_ RegionHandle hRegion) noexcept;
+        // Hide the rendered cursor without changing any logical region cursor positions.
+        VOID HideCursor() noexcept;
+        // Set the rendered cursor style.
+        VOID SetCursorStyle(_In_ CursorStyle style) noexcept;
 
         // Resize the logical terminal grid.
         HRESULT ResizeTerminal(_In_ INT iCols, _In_ INT iRows) noexcept;
@@ -187,6 +218,11 @@ namespace GuiTerminal
         HRESULT GetPreferredWindowSize(_Out_ LPSIZE lpSize, _In_opt_ BOOL bHasMenu = FALSE) const noexcept;
 
     private:
+        enum WindowMessageId : UINT
+        {
+            WindowMessageBlinkRedraw = WM_APP + 1
+        };
+
         enum ScrollBarPart
         {
             ScrollBarPartNone = 0,
@@ -218,11 +254,14 @@ namespace GuiTerminal
 
         // Toggle the blink phase.
         VOID ToggleBlink() noexcept;
+        HRESULT StartBlinkThread() noexcept;
+        VOID StopBlinkThread() noexcept;
+        static VOID BlinkThreadEntry(_In_ Control* lpControl) noexcept;
 
     private:
         mutable std::mutex m_mutex;
         HWND m_hWnd{};
-        UINT_PTR m_uiBlinkTimerId{ 1U };
+        HANDLE m_hBlinkStopEvent{};
         INT m_iCols{};
         INT m_iRows{};
         BOOL m_bTrackingMouse{ FALSE };
@@ -232,6 +271,7 @@ namespace GuiTerminal
         INT m_iScrollDragOriginY{};
         INT m_iScrollOffsetOriginX{};
         INT m_iScrollOffsetOriginY{};
+        std::thread m_threadBlink;
         Internals::Buffer m_sBuffer;
         Internals::Renderer m_sRenderer;
     };

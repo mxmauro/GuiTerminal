@@ -6,77 +6,111 @@
 #include "resource.h"
 #include "..\include\GuiTerminalControl.h"
 
-#define TERMINAL_COLS        160
-#define TERMINAL_ROWS        25
-#define TERMINAL_FONT_FAMILY L"Cascadia Mono"
-#define TERMINAL_FONT_SIZE   12.0f
-#define DEMO_TIMER_ID        2U
+#define TERMINAL_COLS            160
+#define TERMINAL_ROWS            25
+#define TERMINAL_FONT_FAMILY     L"Cascadia Mono"
+#define TERMINAL_FONT_SIZE       12.0f
 
-#define WINDOW_CLASS_NAME    L"SampleGuiTerminalWindow"
-#define WINDOW_TITLE         L"Sample GuiTerminal"
+#define WINDOW_CLASS_NAME        L"SampleGuiTerminalWindow"
+#define WINDOW_TITLE             L"Sample GuiTerminal"
+
+#define DEMO_SCENE_COUNT         4
+#define DEMO_BUTTON_X            3
+#define DEMO_BUTTON_Y            2
+#define DEMO_BUTTON_WIDTH        36
+#define DEMO_BUTTON_HEIGHT       2
+#define DEMO_BUTTON_GAP          3
+#define DEMO_SCENE_X             1
+#define DEMO_SCENE_Y             5
+#define DEMO_SCENE_WIDTH         (TERMINAL_COLS - 2)
+#define DEMO_SCENE_HEIGHT        17
+#define DEMO_STATUS_Y            24
 
 // -----------------------------------------------------------------------------
 
-typedef struct DemoRegionMotion
+enum DemoSceneId
+{
+    DemoSceneScroll = 0,
+    DemoSceneBoxes,
+    DemoSceneNested,
+    DemoSceneMove
+};
+
+typedef struct DemoSceneDefinition
+{
+    LPCWSTR szButtonCaptionTopW;
+    LPCWSTR szButtonCaptionBottomW;
+    COLORREF crButtonForeground;
+    COLORREF crButtonBackground;
+} DemoSceneDefinition;
+
+typedef struct DemoSceneState
 {
     GuiTerminal::RegionHandle hRegion;
-    INT iX;
-    INT iY;
-    INT iWidth;
-    INT iHeight;
-    INT iMinX;
-    INT iMaxX;
-    INT iMinY;
-    INT iMaxY;
-    INT iDeltaX;
-    INT iDeltaY;
-} DemoRegionMotion;
+    GuiTerminal::RegionHandle hCursorRegion;
+    GuiTerminal::Control::CursorStyle cursorStyle;
+} DemoSceneState;
 
 typedef struct DemoState
 {
     GuiTerminal::Control* lpGuiTerminal;
     GuiTerminal::RegionHandle hRegionStatus;
-    DemoRegionMotion sMotionBack;
-    DemoRegionMotion sMotionFront;
-    DemoRegionMotion sMotionBanner;
-    DemoRegionMotion sMotionOffscreen;
+    DemoSceneState arrScenes[DEMO_SCENE_COUNT];
+    INT iActiveScene;
 } DemoState;
 
-typedef struct DemoMouseCallbackContext
-{
-    GuiTerminal::RegionHandle hRegionStatus;
-} DemoMouseCallbackContext;
+// -----------------------------------------------------------------------------
 
 static HRESULT EnablePerMonitorDpiAwareness() noexcept;
 
-static HRESULT CreateMainWindow(_In_ HINSTANCE hInstance, _In_ INT nCmdShow, _In_z_ LPCWSTR szWindowClassW, _In_z_ LPCWSTR szTitleW,
-                                _Out_ HWND* lphWnd) noexcept;
+static HRESULT CreateMainWindow(_In_ HINSTANCE hInstance, _In_ INT nCmdShow, _In_z_ LPCWSTR szWindowClassW,
+                                _In_z_ LPCWSTR szTitleW, _Out_ HWND* lphWnd) noexcept;
 
-static LRESULT CALLBACK MainWndProc(_In_ HWND hWnd, _In_ UINT uMessage, _In_ WPARAM wParam, _In_ LPARAM lParam) noexcept;
+static LRESULT CALLBACK MainWndProc(_In_ HWND hWnd, _In_ UINT uMessage, _In_ WPARAM wParam,
+                                    _In_ LPARAM lParam) noexcept;
 static LRESULT HandleCreate(_In_ HWND hWnd) noexcept;
-static LRESULT HandleDemoTimer(_In_ HWND hWnd) noexcept;
-static LRESULT HandleMouseButton(_In_ HWND hWnd, _In_ BOOL bLeftButton, _In_ BOOL bButtonDown, _In_ LPCWSTR szButtonNameW,
-                                 _In_ LPCWSTR szActionNameW, _In_ INT iX, _In_ INT iY) noexcept;
+static LRESULT HandleMouseButton(_In_ HWND hWnd, _In_ BOOL bLeftButton, _In_ BOOL bButtonDown, _In_z_ LPCWSTR szButtonNameW,
+                                 _In_z_ LPCWSTR szActionNameW, _In_ INT iX, _In_ INT iY) noexcept;
 
 static HRESULT ResizeWindowToPreferredClientArea(_In_ HWND hWnd, _In_ GuiTerminal::Control* lpGuiTerminal) noexcept;
 
 static HRESULT RunDemo(_In_ GuiTerminal::Control* lpGuiTerminal) noexcept;
-static VOID DrawRegionFrames(_In_ GuiTerminal::Control* lpGuiTerminal, _In_opt_ GuiTerminal::RegionHandle hRegionStatus,
-                             _In_opt_ GuiTerminal::RegionHandle hRegionBack, _In_opt_ GuiTerminal::RegionHandle hRegionFront,
-                             _In_opt_ GuiTerminal::RegionHandle hRegionBanner,
-                             _In_opt_ GuiTerminal::RegionHandle hRegionOffscreen) noexcept;
-static VOID UpdateRegionMotion(_Inout_ DemoRegionMotion* lpsMotion) noexcept;
-static DemoRegionMotion* GetMotionForRegion(_In_ GuiTerminal::RegionHandle hRegion) noexcept;
-static VOID BringDemoRegionToFront(_In_ GuiTerminal::Control* lpGuiTerminal, _In_ GuiTerminal::RegionHandle hRegion) noexcept;
-static GuiTerminal::RegionHandle HitTestDemoRegion(_In_ INT iCol, _In_ INT iRow) noexcept;
-static BOOL IsCellInsideMotion(_In_ const DemoRegionMotion* lpsMotion, _In_ INT iCol, _In_ INT iRow) noexcept;
-static VOID WriteMouseStatus(_In_ GuiTerminal::Control* lpGuiTerminal, _In_z_ LPCWSTR szButtonNameW,
-                             _In_z_ LPCWSTR szActionNameW, _In_ INT iX, _In_ INT iY, _In_ INT iCol, _In_ INT iRow) noexcept;
+static VOID DrawTopRowSamples(_In_ GuiTerminal::Control* lpGuiTerminal) noexcept;
+static VOID DrawButtons(_In_ GuiTerminal::Control* lpGuiTerminal) noexcept;
+static VOID DrawButton(_In_ GuiTerminal::Control* lpGuiTerminal, _In_ INT iSceneIndex,
+                       _In_ BOOL bActive) noexcept;
+static HRESULT InitializeScenes(_In_ GuiTerminal::Control* lpGuiTerminal) noexcept;
+static HRESULT InitializeScrollScene(_In_ GuiTerminal::Control* lpGuiTerminal, _In_ GuiTerminal::RegionHandle hRegionScene,
+                                     _Out_ GuiTerminal::RegionHandle* lphCursorRegion) noexcept;
+static HRESULT InitializeBoxesScene(_In_ GuiTerminal::Control* lpGuiTerminal, _In_ GuiTerminal::RegionHandle hRegionScene,
+                                    _Out_ GuiTerminal::RegionHandle* lphCursorRegion) noexcept;
+static HRESULT InitializeNestedScene(_In_ GuiTerminal::Control* lpGuiTerminal, _In_ GuiTerminal::RegionHandle hRegionScene,
+                                     _Out_ GuiTerminal::RegionHandle* lphCursorRegion) noexcept;
+static HRESULT InitializeMoveScene(_In_ GuiTerminal::Control* lpGuiTerminal, _In_ GuiTerminal::RegionHandle hRegionScene,
+                                   _Out_ GuiTerminal::RegionHandle* lphCursorRegion) noexcept;
+static VOID SelectScene(_In_ GuiTerminal::Control* lpGuiTerminal, _In_ INT iSceneIndex) noexcept;
+static INT HitTestButton(_In_ INT iCol, _In_ INT iRow) noexcept;
+static VOID GetButtonRect(_In_ INT iSceneIndex, _Out_ LPINT lpiX, _Out_ LPINT lpiY,
+                          _Out_ LPINT lpiWidth, _Out_ LPINT lpiHeight) noexcept;
+static VOID WriteCenteredText(_In_ GuiTerminal::Control* lpGuiTerminal, _In_ INT iCol, _In_ INT iRow, _In_ INT iWidth,
+                              _In_z_ LPCWSTR szTextW, _In_ COLORREF crForeground, _In_ COLORREF crBackground,
+                              _In_ BOOL bBold) noexcept;
+static VOID WriteMouseStatus(_In_ GuiTerminal::Control* lpGuiTerminal, _In_z_ LPCWSTR szButtonNameW, _In_z_ LPCWSTR szActionNameW,
+                             _In_ INT iX, _In_ INT iY, _In_ INT iCol, _In_ INT iRow) noexcept;
 
 // -----------------------------------------------------------------------------
 
-static DemoMouseCallbackContext g_sDemoMouseCallbackContext{};
+static const DemoSceneDefinition g_arrSceneDefinitions[DEMO_SCENE_COUNT] =
+{
+    { L"SCENE 1", L"SCROLL", RGB(16U, 28U, 40U), RGB(120U, 205U, 255U) },
+    { L"SCENE 2", L"BOXES", RGB(48U, 24U, 0U), RGB(255U, 196U, 90U) },
+    { L"SCENE 3", L"NESTED", RGB(18U, 18U, 18U), RGB(132U, 230U, 126U) },
+    { L"SCENE 4", L"MOVE", RGB(255U, 255U, 255U), RGB(176U, 90U, 216U) }
+};
+
 static DemoState g_sDemoState{};
+
+// -----------------------------------------------------------------------------
 
 INT APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance, _In_ LPWSTR lpCmdLineW, _In_ INT nCmdShow)
 {
@@ -130,8 +164,8 @@ static HRESULT EnablePerMonitorDpiAwareness() noexcept
     return hr;
 }
 
-static HRESULT CreateMainWindow(_In_ HINSTANCE hInstance, _In_ INT nCmdShow, _In_z_ LPCWSTR szWindowClassW, _In_z_ LPCWSTR szTitleW,
-                                _Out_ HWND* lphWnd) noexcept
+static HRESULT CreateMainWindow(_In_ HINSTANCE hInstance, _In_ INT nCmdShow, _In_z_ LPCWSTR szWindowClassW,
+                                _In_z_ LPCWSTR szTitleW, _Out_ HWND* lphWnd) noexcept
 {
     WNDCLASSEXW sWcExW;
     HWND hWnd;
@@ -174,7 +208,8 @@ static HRESULT CreateMainWindow(_In_ HINSTANCE hInstance, _In_ INT nCmdShow, _In
     return S_OK;
 }
 
-static LRESULT CALLBACK MainWndProc(_In_ HWND hWnd, _In_ UINT uMessage, _In_ WPARAM wParam, _In_ LPARAM lParam) noexcept
+static LRESULT CALLBACK MainWndProc(_In_ HWND hWnd, _In_ UINT uMessage, _In_ WPARAM wParam,
+                                    _In_ LPARAM lParam) noexcept
 {
     LRESULT lResult;
 
@@ -188,25 +223,24 @@ static LRESULT CALLBACK MainWndProc(_In_ HWND hWnd, _In_ UINT uMessage, _In_ WPA
         case WM_CREATE:
             return HandleCreate(hWnd);
         case WM_LBUTTONDOWN:
-            return HandleMouseButton(hWnd, TRUE, TRUE, L"Left", L"Down", GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
+            return HandleMouseButton(hWnd, TRUE, TRUE, L"Left", L"Down",
+                                     GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
         case WM_LBUTTONUP:
-            return HandleMouseButton(hWnd, TRUE, FALSE, L"Left", L"Up", GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
+            return HandleMouseButton(hWnd, TRUE, FALSE, L"Left", L"Up",
+                                     GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
         case WM_RBUTTONDOWN:
-            return HandleMouseButton(hWnd, FALSE, TRUE, L"Right", L"Down", GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
+            return HandleMouseButton(hWnd, FALSE, TRUE, L"Right", L"Down",
+                                     GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
         case WM_RBUTTONUP:
-            return HandleMouseButton(hWnd, FALSE, FALSE, L"Right", L"Up", GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
+            return HandleMouseButton(hWnd, FALSE, FALSE, L"Right", L"Up",
+                                     GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
         case WM_MBUTTONDOWN:
-            return HandleMouseButton(hWnd, FALSE, TRUE, L"Middle", L"Down", GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
+            return HandleMouseButton(hWnd, FALSE, TRUE, L"Middle", L"Down",
+                                     GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
         case WM_MBUTTONUP:
-            return HandleMouseButton(hWnd, FALSE, FALSE, L"Middle", L"Up", GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
-        case WM_TIMER:
-            if (static_cast<UINT_PTR>(wParam) == DEMO_TIMER_ID)
-            {
-                return HandleDemoTimer(hWnd);
-            }
-            break;
+            return HandleMouseButton(hWnd, FALSE, FALSE, L"Middle", L"Up",
+                                     GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
         case WM_DESTROY:
-            KillTimer(hWnd, DEMO_TIMER_ID);
             PostQuitMessage(0);
             return 0;
     }
@@ -240,30 +274,16 @@ static LRESULT HandleCreate(_In_ HWND hWnd) noexcept
     {
         return -1;
     }
-    if (SetTimer(hWnd, DEMO_TIMER_ID, 1000U, nullptr) == 0U)
-    {
-        return -1;
-    }
     return 0;
 }
 
-static LRESULT HandleDemoTimer(_In_ HWND hWnd) noexcept
-{
-    UpdateRegionMotion(&g_sDemoState.sMotionBack);
-    UpdateRegionMotion(&g_sDemoState.sMotionFront);
-    UpdateRegionMotion(&g_sDemoState.sMotionBanner);
-    UpdateRegionMotion(&g_sDemoState.sMotionOffscreen);
-    InvalidateRect(hWnd, nullptr, FALSE);
-    return 0;
-}
-
-static LRESULT HandleMouseButton(_In_ HWND hWnd, _In_ BOOL bLeftButton, _In_ BOOL bButtonDown, _In_ LPCWSTR szButtonNameW,
-                                 _In_ LPCWSTR szActionNameW, _In_ INT iX, _In_ INT iY) noexcept
+static LRESULT HandleMouseButton(_In_ HWND hWnd, _In_ BOOL bLeftButton, _In_ BOOL bButtonDown, _In_z_ LPCWSTR szButtonNameW,
+                                 _In_z_ LPCWSTR szActionNameW, _In_ INT iX, _In_ INT iY) noexcept
 {
     GuiTerminal::Control* lpGuiTerminal;
-    GuiTerminal::RegionHandle hRegionHit;
     INT iCol;
     INT iRow;
+    INT iSceneHit;
 
     lpGuiTerminal = GuiTerminal::Control::GetControl(hWnd);
     if (!lpGuiTerminal)
@@ -278,12 +298,13 @@ static LRESULT HandleMouseButton(_In_ HWND hWnd, _In_ BOOL bLeftButton, _In_ BOO
         iCol = -1;
         iRow = -1;
     }
+
     if ((bLeftButton != FALSE) && (bButtonDown != FALSE))
     {
-        hRegionHit = HitTestDemoRegion(iCol, iRow);
-        if (hRegionHit)
+        iSceneHit = HitTestButton(iCol, iRow);
+        if (iSceneHit >= 0)
         {
-            BringDemoRegionToFront(lpGuiTerminal, hRegionHit);
+            SelectScene(lpGuiTerminal, iSceneHit);
         }
     }
 
@@ -319,300 +340,516 @@ static HRESULT ResizeWindowToPreferredClientArea(_In_ HWND hWnd, _In_ GuiTermina
 
 static HRESULT RunDemo(_In_ GuiTerminal::Control* lpGuiTerminal) noexcept
 {
-    GuiTerminal::RegionHandle hRegionStatus;
-    GuiTerminal::RegionHandle hRegionBack;
-    GuiTerminal::RegionHandle hRegionFront;
-    GuiTerminal::RegionHandle hRegionBanner;
-    GuiTerminal::RegionHandle hRegionOffscreen;
-    WCHAR szBufferW[256];
-    INT iIndex;
     HRESULT hr;
 
-    hRegionStatus = nullptr;
+    if (!lpGuiTerminal)
+    {
+        return E_POINTER;
+    }
+
     lpGuiTerminal->Clear();
     g_sDemoState = DemoState{};
     g_sDemoState.lpGuiTerminal = lpGuiTerminal;
+    g_sDemoState.iActiveScene = DemoSceneScroll;
 
-    lpGuiTerminal->Write(L"\x1b[1;97mWWin32 + Direct2D/DirectWrite terminal demo\x1b[0m\r\n"
-                         L"\x1b[38;2;255;170;40mTruecolor foreground\x1b[0m  "
-                         L"\x1b[48;2;0;96;160;97mtruecolor background\x1b[0m  "
-                         L"\x1b[4munderline\x1b[24m  "
-                         L"\x1b[1mbold\x1b[22m  "
-                         L"\x1b[5mblink\x1b[25m\r\n"
-                         L"\x1b[32mGreen\x1b[0m "
-                          L"\x1b[33mYellow\x1b[0m "
-                          L"\x1b[34mBlue\x1b[0m "
-                          L"\x1b[91mBright red\x1b[0m "
-                          L"\x1b[38;5;141m256-color\x1b[0m\r\n"
-                          L"\x1b[s\x1b[6;5HPositioned at row 6 col 5\x1b[u\r\n"
-                          L"\x1b[5;1H\x1b[2KLeft: overlapping regions and region borders. "
-                          L"Right: global lines, rectangles, clipping, and out-of-bounds draws.");
-
-    hr = lpGuiTerminal->CreateRegion(0, 23, TERMINAL_COLS, 2, &hRegionStatus);
-    if (FAILED(hr))
-    {
-        return hr;
-    }
-    g_sDemoMouseCallbackContext.hRegionStatus = hRegionStatus;
-    g_sDemoState.hRegionStatus = hRegionStatus;
-    lpGuiTerminal->WriteRegion(hRegionStatus, L"\x1b[100;97m Mouse events \x1b[0m\r\n"
-                                              L"Left/Right/Middle up/down. Outside cells reports col=-1 row=-1.");
-
-    hr = lpGuiTerminal->CreateRegion(4, 7, 34, 13, &hRegionBack);
-    if (FAILED(hr))
-    {
-        return hr;
-    }
-    hr = lpGuiTerminal->CreateRegion(22, 9, 34, 13, &hRegionFront);
-    if (FAILED(hr))
-    {
-        return hr;
-    }
-    hr = lpGuiTerminal->CreateRegion(-6, 6, 26, 4, &hRegionBanner);
-    if (FAILED(hr))
-    {
-        return hr;
-    }
-    hr = lpGuiTerminal->CreateRegion(154, 10, 12, 5, &hRegionOffscreen);
+    DrawTopRowSamples(lpGuiTerminal);
+    hr = lpGuiTerminal->CreateRegion(0, DEMO_STATUS_Y, TERMINAL_COLS, 1, &g_sDemoState.hRegionStatus);
     if (FAILED(hr))
     {
         return hr;
     }
 
-    g_sDemoState.sMotionBack = DemoRegionMotion{ hRegionBack, 4, 7, 34, 13, 2, 24, 7, 7, 1, 0 };
-    g_sDemoState.sMotionFront = DemoRegionMotion{ hRegionFront, 22, 9, 34, 13, 22, 42, 9, 9, -1, 0 };
-    g_sDemoState.sMotionBanner = DemoRegionMotion{ hRegionBanner, -6, 6, 26, 4, -6, -6, 6, 12, 0, 1 };
-    g_sDemoState.sMotionOffscreen = DemoRegionMotion{ hRegionOffscreen, 154, 10, 12, 5, 132, 154, 10, 18, -1, 1 };
-    hr = lpGuiTerminal->SetRegionContext(hRegionBack, &g_sDemoState.sMotionBack);
-    if (FAILED(hr))
-    {
-        return hr;
-    }
-    hr = lpGuiTerminal->SetRegionContext(hRegionFront, &g_sDemoState.sMotionFront);
-    if (FAILED(hr))
-    {
-        return hr;
-    }
-    hr = lpGuiTerminal->SetRegionContext(hRegionBanner, &g_sDemoState.sMotionBanner);
-    if (FAILED(hr))
-    {
-        return hr;
-    }
-    hr = lpGuiTerminal->SetRegionContext(hRegionOffscreen, &g_sDemoState.sMotionOffscreen);
+    hr = InitializeScenes(lpGuiTerminal);
     if (FAILED(hr))
     {
         return hr;
     }
 
-    lpGuiTerminal->WriteRegion(hRegionBack, L"\x1b[44;97m Back region \x1b[0m\r\n");
-    lpGuiTerminal->WriteRegion(hRegionFront, L"\x1b[42;30m Front region \x1b[0m\r\n");
-    lpGuiTerminal->WriteRegion(hRegionBanner, L"\x1b[42;97m OFFSCREEN BANNER \x1b[0m\r\n"
-                                               L"\x1b[42;97m clipped on left \x1b[0m");
-    lpGuiTerminal->WriteRegion(hRegionOffscreen, L"\x1b[45;97m edge region \x1b[0m\r\nmoves in/out\r\nof bounds");
-    lpGuiTerminal->DrawRegionHorizontalLine(hRegionBack, -3, 4, 40, GuiTerminal::Control::StrokeSingleLine, RGB(255U, 220U, 160U),
-                                            RGB(0U, 20U, 70U), GuiTerminal::Control::StyleNone);
-    lpGuiTerminal->DrawRegionVerticalLine(hRegionBack, 16, -2, 18, GuiTerminal::Control::StrokeDoubleLine, RGB(255U, 220U, 160U),
-                                          RGB(0U, 20U, 70U), GuiTerminal::Control::StyleNone);
-    lpGuiTerminal->DrawRegionHorizontalLine(hRegionBack, 2, 10, 20, GuiTerminal::Control::StrokeShadeMedium, RGB(190U, 190U, 190U),
-                                            RGB(0U, 20U, 70U), GuiTerminal::Control::StyleNone);
-    lpGuiTerminal->DrawRegionVerticalLine(hRegionFront, 10, -2, 18, GuiTerminal::Control::StrokeSolidBlock, RGB(70U, 40U, 40U),
-                                          RGB(120U, 200U, 120U), GuiTerminal::Control::StyleNone);
-    lpGuiTerminal->DrawRegionHorizontalLine(hRegionFront, 0, 6, 34, GuiTerminal::Control::StrokeShadeDark, RGB(50U, 80U, 50U),
-                                            RGB(120U, 200U, 120U), GuiTerminal::Control::StyleNone);
-
-    for (iIndex = 1; iIndex <= 14; iIndex++)
-    {
-        swprintf_s(szBufferW, sizeof(szBufferW) / sizeof(szBufferW[0]), L" \x1b[38;5;81mback\x1b[0m line %d 0123456789\r\n", iIndex);
-        lpGuiTerminal->WriteRegion(hRegionBack, szBufferW);
-    }
-
-    lpGuiTerminal->WriteRegion(hRegionFront,
-                               L"\x1b[30;102m opaque spaces demo \x1b[0m\r\n"
-                               L"\x1b[30;102m                \x1b[0m\r\n"
-                               L"\x1b[30;102m top region     \x1b[0m\r\n");
-    for (iIndex = 1; iIndex <= 10; iIndex++)
-    {
-        swprintf_s(szBufferW, sizeof(szBufferW) / sizeof(szBufferW[0]), L" \x1b[38;2;255;120;120mfront\x1b[0m line %d\r\n", iIndex);
-        lpGuiTerminal->WriteRegion(hRegionFront, szBufferW);
-    }
-
-    lpGuiTerminal->Write(L"\x1b[7;86H\x1b[1;97mGlobal drawing helpers\x1b[0m"
-                         L"\x1b[8;86Hsingle/double joins, shading and clipping");
-    lpGuiTerminal->DrawBox(85, 9, 66, 12, GuiTerminal::Control::BoxSideTopDouble | GuiTerminal::Control::BoxSideLeftDouble,
-                           RGB(220U, 220U, 220U), RGB(15U, 15U, 20U), GuiTerminal::Control::StyleNone);
-    lpGuiTerminal->DrawHorizontalLine(82, 12, 74, GuiTerminal::Control::StrokeSingleLine, RGB(255U, 210U, 150U), RGB(15U, 15U, 20U),
-                                      GuiTerminal::Control::StyleNone);
-    lpGuiTerminal->DrawVerticalLine(101, 8, 16, GuiTerminal::Control::StrokeDoubleLine, RGB(150U, 220U, 255U), RGB(15U, 15U, 20U),
-                                    GuiTerminal::Control::StyleNone);
-    lpGuiTerminal->DrawHorizontalLine(90, 15, 28, GuiTerminal::Control::StrokeShadeLight, RGB(180U, 180U, 180U), RGB(15U, 15U, 20U),
-                                      GuiTerminal::Control::StyleNone);
-    lpGuiTerminal->DrawHorizontalLine(90, 16, 28, GuiTerminal::Control::StrokeShadeMedium, RGB(200U, 200U, 200U), RGB(15U, 15U, 20U),
-                                      GuiTerminal::Control::StyleNone);
-    lpGuiTerminal->DrawHorizontalLine(90, 17, 28, GuiTerminal::Control::StrokeShadeDark, RGB(220U, 220U, 220U), RGB(15U, 15U, 20U),
-                                      GuiTerminal::Control::StyleNone);
-    lpGuiTerminal->DrawHorizontalLine(90, 18, 28, GuiTerminal::Control::StrokeSolidBlock, RGB(255U, 255U, 255U), RGB(15U, 15U, 20U),
-                                      GuiTerminal::Control::StyleNone);
-    lpGuiTerminal->DrawBox(146, 10, 22, 7,
-                           GuiTerminal::Control::BoxSideTopDouble | GuiTerminal::Control::BoxSideRightDouble |
-                               GuiTerminal::Control::BoxSideBottomDouble,
-                           RGB(255U, 180U, 120U), RGB(15U, 15U, 20U), GuiTerminal::Control::StyleNone);
-    lpGuiTerminal->DrawHorizontalLine(150, 20, 24, GuiTerminal::Control::StrokeDoubleLine, RGB(255U, 200U, 160U), RGB(15U, 15U, 20U),
-                                      GuiTerminal::Control::StyleNone);
-    lpGuiTerminal->DrawVerticalLine(158, 18, 10, GuiTerminal::Control::StrokeSingleLine, RGB(190U, 210U, 255U), RGB(15U, 15U, 20U),
-                                    GuiTerminal::Control::StyleNone);
-    lpGuiTerminal->DrawBox(120, 20, 0, 4, GuiTerminal::Control::BoxSideLeftDouble | GuiTerminal::Control::BoxSideRightDouble,
-                           RGB(150U, 255U, 180U), RGB(15U, 15U, 20U), GuiTerminal::Control::StyleNone);
-    lpGuiTerminal->DrawBox(124, 20, 10, 0, GuiTerminal::Control::BoxSideTopDouble | GuiTerminal::Control::BoxSideBottomDouble,
-                           RGB(150U, 255U, 180U), RGB(15U, 15U, 20U), GuiTerminal::Control::StyleNone);
-    lpGuiTerminal->Write(L"\x1b[11;88Hbox clipped on right"
-                         L"\x1b[13;88Hsingle + double joins"
-                         L"\x1b[19;88Hshade strokes overwrite"
-                         L"\x1b[21;126Hzero width -> vertical"
-                         L"\x1b[22;126Hzero height -> horizontal");
-
-    lpGuiTerminal->SendRegionToBack(hRegionBack);
-    lpGuiTerminal->BringRegionToFront(hRegionFront);
-    lpGuiTerminal->BringRegionToFront(hRegionBanner);
-    BringDemoRegionToFront(lpGuiTerminal, hRegionFront);
-    BringDemoRegionToFront(lpGuiTerminal, hRegionBanner);
-    DrawRegionFrames(lpGuiTerminal, hRegionStatus, hRegionBack, hRegionFront, hRegionBanner, hRegionOffscreen);
-
+    DrawButtons(lpGuiTerminal);
+    SelectScene(lpGuiTerminal, DemoSceneScroll);
+    WriteMouseStatus(lpGuiTerminal, L"Ready", L"", -1, -1, -1, -1);
     return S_OK;
 }
 
-static VOID DrawRegionFrames(_In_ GuiTerminal::Control* lpGuiTerminal, _In_opt_ GuiTerminal::RegionHandle hRegionStatus,
-                             _In_opt_ GuiTerminal::RegionHandle hRegionBack, _In_opt_ GuiTerminal::RegionHandle hRegionFront,
-                             _In_opt_ GuiTerminal::RegionHandle hRegionBanner, _In_opt_ GuiTerminal::RegionHandle hRegionOffscreen) noexcept
+static VOID DrawTopRowSamples(_In_ GuiTerminal::Control* lpGuiTerminal) noexcept
 {
     if (!lpGuiTerminal)
     {
         return;
     }
-    UNREFERENCED_PARAMETER(hRegionStatus);
 
-    if (hRegionBack)
+    lpGuiTerminal->Write(L"\x1b[1;1H"
+                         L"GuiTerminal demo: "
+                         L"\x1b[38;2;255;170;40mTruecolor FG\x1b[0m  "
+                         L"\x1b[48;2;0;96;160m\x1b[97mTruecolor BG\x1b[0m  "
+                         L"\x1b[4munderline\x1b[24m  "
+                         L"\x1b[1mbold\x1b[22m  "
+                         L"\x1b[5mblink\x1b[25m  "
+                         L"\x1b[32mgreen\x1b[0m  "
+                         L"\x1b[33myellow\x1b[0m  "
+                         L"\x1b[34mblue\x1b[0m  "
+                         L"\x1b[91mbright red\x1b[0m  "
+                         L"\x1b[38;5;141m256-color\x1b[0m");
+}
+
+static VOID DrawButtons(_In_ GuiTerminal::Control* lpGuiTerminal) noexcept
+{
+    INT iSceneIndex;
+
+    if (!lpGuiTerminal)
     {
-        lpGuiTerminal->DrawRegionBox(hRegionBack, 0, 0, 34, 13, GuiTerminal::Control::BoxSideNone, RGB(180U, 220U, 255U), RGB(0U, 20U, 70U),
-                                     GuiTerminal::Control::StyleNone);
+        return;
     }
-    if (hRegionFront)
+
+    for (iSceneIndex = 0; iSceneIndex < DEMO_SCENE_COUNT; iSceneIndex++)
     {
-        lpGuiTerminal->DrawRegionBox(hRegionFront, 0, 0, 34, 13,
-                                     GuiTerminal::Control::BoxSideTopDouble | GuiTerminal::Control::BoxSideRightDouble,
-                                     RGB(20U, 20U, 20U), RGB(120U, 200U, 120U), GuiTerminal::Control::StyleNone);
-    }
-    if (hRegionBanner)
-    {
-        lpGuiTerminal->DrawRegionBox(hRegionBanner, 0, 0, 26, 4,
-                                     GuiTerminal::Control::BoxSideTopDouble | GuiTerminal::Control::BoxSideBottomDouble,
-                                     RGB(255U, 255U, 255U), RGB(0U, 140U, 0U), GuiTerminal::Control::StyleNone);
-    }
-    if (hRegionOffscreen)
-    {
-        lpGuiTerminal->DrawRegionBox(hRegionOffscreen, 0, 0, 12, 5,
-                                     GuiTerminal::Control::BoxSideLeftDouble | GuiTerminal::Control::BoxSideRightDouble,
-                                     RGB(255U, 255U, 255U), RGB(90U, 0U, 90U), GuiTerminal::Control::StyleNone);
+        DrawButton(lpGuiTerminal, iSceneIndex, (g_sDemoState.iActiveScene == iSceneIndex) ? TRUE : FALSE);
     }
 }
 
-static VOID UpdateRegionMotion(_Inout_ DemoRegionMotion* lpsMotion) noexcept
+static VOID DrawButton(_In_ GuiTerminal::Control* lpGuiTerminal, _In_ INT iSceneIndex, _In_ BOOL bActive) noexcept
 {
+    const DemoSceneDefinition* lpsDefinition;
+    COLORREF crBackground;
+    COLORREF crForeground;
+    INT iX;
+    INT iY;
+    INT iWidth;
+    INT iHeight;
+
+    if ((!lpGuiTerminal) || (iSceneIndex < 0) || (iSceneIndex >= DEMO_SCENE_COUNT))
+    {
+        return;
+    }
+
+    lpsDefinition = &g_arrSceneDefinitions[iSceneIndex];
+    GetButtonRect(iSceneIndex, &iX, &iY, &iWidth, &iHeight);
+    crBackground = (bActive != FALSE) ? lpsDefinition->crButtonBackground :
+                                        RGB(GetRValue(lpsDefinition->crButtonBackground) / 2U,
+                                            GetGValue(lpsDefinition->crButtonBackground) / 2U,
+                                            GetBValue(lpsDefinition->crButtonBackground) / 2U);
+    crForeground = (bActive != FALSE) ? RGB(255U, 255U, 255U) : lpsDefinition->crButtonForeground;
+
+    lpGuiTerminal->FillArea(iX, iY, iWidth, iHeight, L' ', crForeground, crBackground,
+                            (bActive != FALSE) ? GuiTerminal::Control::StyleBold : GuiTerminal::Control::StyleNone);
+    WriteCenteredText(lpGuiTerminal, iX, iY, iWidth, lpsDefinition->szButtonCaptionTopW,
+                      crForeground, crBackground, bActive);
+    WriteCenteredText(lpGuiTerminal, iX, iY + 1, iWidth, lpsDefinition->szButtonCaptionBottomW,
+                      crForeground, crBackground, bActive);
+}
+
+static HRESULT InitializeScenes(_In_ GuiTerminal::Control* lpGuiTerminal) noexcept
+{
+    GuiTerminal::RegionHandle hRegionScene;
+    GuiTerminal::RegionHandle hCursorRegion;
+    HRESULT hr;
+    INT iSceneIndex;
+
+    if (!lpGuiTerminal)
+    {
+        return E_POINTER;
+    }
+
+    for (iSceneIndex = 0; iSceneIndex < DEMO_SCENE_COUNT; iSceneIndex++)
+    {
+        hRegionScene = nullptr;
+        hCursorRegion = nullptr;
+        hr = lpGuiTerminal->CreateRegion(DEMO_SCENE_X, DEMO_SCENE_Y, DEMO_SCENE_WIDTH, DEMO_SCENE_HEIGHT, &hRegionScene);
+        if (FAILED(hr))
+        {
+            return hr;
+        }
+
+        g_sDemoState.arrScenes[iSceneIndex].hRegion = hRegionScene;
+        g_sDemoState.arrScenes[iSceneIndex].hCursorRegion = hRegionScene;
+        g_sDemoState.arrScenes[iSceneIndex].cursorStyle = GuiTerminal::Control::CursorUnderscore;
+
+        switch (iSceneIndex)
+        {
+            case DemoSceneScroll:
+                hr = InitializeScrollScene(lpGuiTerminal, hRegionScene, &hCursorRegion);
+                g_sDemoState.arrScenes[iSceneIndex].cursorStyle = GuiTerminal::Control::CursorUnderscore;
+                break;
+            case DemoSceneBoxes:
+                hr = InitializeBoxesScene(lpGuiTerminal, hRegionScene, &hCursorRegion);
+                g_sDemoState.arrScenes[iSceneIndex].cursorStyle = GuiTerminal::Control::CursorBarLeft;
+                break;
+            case DemoSceneNested:
+                hr = InitializeNestedScene(lpGuiTerminal, hRegionScene, &hCursorRegion);
+                g_sDemoState.arrScenes[iSceneIndex].cursorStyle = GuiTerminal::Control::CursorBlock;
+                break;
+            case DemoSceneMove:
+                hr = InitializeMoveScene(lpGuiTerminal, hRegionScene, &hCursorRegion);
+                g_sDemoState.arrScenes[iSceneIndex].cursorStyle = GuiTerminal::Control::CursorBarLeft;
+                break;
+            default:
+                hr = E_UNEXPECTED;
+                break;
+        }
+        if (FAILED(hr))
+        {
+            return hr;
+        }
+        if (hCursorRegion)
+        {
+            g_sDemoState.arrScenes[iSceneIndex].hCursorRegion = hCursorRegion;
+        }
+    }
+
+    return S_OK;
+}
+
+static HRESULT InitializeScrollScene(_In_ GuiTerminal::Control* lpGuiTerminal, _In_ GuiTerminal::RegionHandle hRegionScene,
+                                     _Out_ GuiTerminal::RegionHandle* lphCursorRegion) noexcept
+{
+    GuiTerminal::RegionHandle hRegionLog;
+    WCHAR szBufferW[160];
+    INT iLine;
     HRESULT hr;
 
-    if (!lpsMotion || !g_sDemoState.lpGuiTerminal || !lpsMotion->hRegion)
+    if ((!lpGuiTerminal) || (!hRegionScene) || (!lphCursorRegion))
     {
-        return;
+        return E_POINTER;
     }
 
-    if (lpsMotion->iDeltaX != 0)
-    {
-        if ((lpsMotion->iX + lpsMotion->iDeltaX) < lpsMotion->iMinX || (lpsMotion->iX + lpsMotion->iDeltaX) > lpsMotion->iMaxX)
-        {
-            lpsMotion->iDeltaX = -lpsMotion->iDeltaX;
-        }
-    }
-    if (lpsMotion->iDeltaY != 0)
-    {
-        if (((lpsMotion->iY + lpsMotion->iDeltaY) < lpsMotion->iMinY) ||
-            ((lpsMotion->iY + lpsMotion->iDeltaY) > lpsMotion->iMaxY))
-        {
-            lpsMotion->iDeltaY = -lpsMotion->iDeltaY;
-        }
-    }
+    *lphCursorRegion = hRegionScene;
+    hRegionLog = nullptr;
+    lpGuiTerminal->FillRegionArea(hRegionScene, 0, 0, DEMO_SCENE_WIDTH, DEMO_SCENE_HEIGHT, L' ', RGB(225U, 240U, 255U), RGB(0U, 24U, 52U),
+                                  GuiTerminal::Control::StyleNone);
+    lpGuiTerminal->DrawRegionBox(hRegionScene, 0, 0, DEMO_SCENE_WIDTH, DEMO_SCENE_HEIGHT, GuiTerminal::Control::BoxSideLeftDouble,
+                                 RGB(150U, 220U, 255U), RGB(0U, 24U, 52U), GuiTerminal::Control::StyleNone);
+    lpGuiTerminal->WriteRegion(hRegionScene,
+                               L"\x1b[1;4H\x1b[48;2;0;24;52m\x1b[1;97m Scroll scene \x1b[0m"
+                               L"\x1b[2;3HWriteRegion keeps the newest lines visible inside a smaller child region."
+                               L"\x1b[3;3HThe pane below receives more lines than it can display.");
 
-    lpsMotion->iX += lpsMotion->iDeltaX;
-    lpsMotion->iY += lpsMotion->iDeltaY;
-    hr = g_sDemoState.lpGuiTerminal->RelocateRegion(
-        lpsMotion->hRegion,
-        lpsMotion->iX,
-        lpsMotion->iY,
-        lpsMotion->iWidth,
-        lpsMotion->iHeight);
+    hr = lpGuiTerminal->CreateRegion(3, 4, 70, 10, &hRegionLog, hRegionScene);
     if (FAILED(hr))
     {
-        lpsMotion->iX -= lpsMotion->iDeltaX;
-        lpsMotion->iY -= lpsMotion->iDeltaY;
-        lpsMotion->iDeltaX = -lpsMotion->iDeltaX;
-        lpsMotion->iDeltaY = -lpsMotion->iDeltaY;
+        return hr;
     }
-}
 
-static DemoRegionMotion* GetMotionForRegion(_In_ GuiTerminal::RegionHandle hRegion) noexcept
-{
-    if (!g_sDemoState.lpGuiTerminal || !hRegion)
+    lpGuiTerminal->FillRegionArea(hRegionLog, 0, 0, 70, 10, L' ', RGB(220U, 220U, 220U), RGB(8U, 12U, 20U),
+                                  GuiTerminal::Control::StyleNone);
+    lpGuiTerminal->DrawRegionBox(hRegionLog, 0, 0, 70, 10,
+                                 GuiTerminal::Control::BoxSideTopDouble | GuiTerminal::Control::BoxSideRightDouble,
+                                 RGB(180U, 220U, 255U), RGB(8U, 12U, 20U), GuiTerminal::Control::StyleNone);
+    lpGuiTerminal->WriteRegion(hRegionLog, L"\x1b[1;3H\x1b[38;5;117mBuffered output\x1b[0m");
+
+    for (iLine = 1; iLine <= 18; iLine++)
     {
-        return nullptr;
+        swprintf_s(szBufferW, sizeof(szBufferW) / sizeof(szBufferW[0]),
+                   L"\x1b[38;5;%dmline %02d  scroll sample 0123456789 ABCDEFGHIJKLMNOPQRSTUVWXYZ\r\n",
+                   80 + (iLine % 8), iLine);
+        lpGuiTerminal->WriteRegion(hRegionLog, szBufferW);
     }
 
-    return reinterpret_cast<DemoRegionMotion*>(g_sDemoState.lpGuiTerminal->GetRegionContext(hRegion));
+    lpGuiTerminal->WriteRegion(hRegionScene,
+                               L"\x1b[5;80H\x1b[38;5;117mWhat to inspect\x1b[0m"
+                               L"\x1b[7;80H- child-region clipping"
+                               L"\x1b[8;80H- retained background colors"
+                               L"\x1b[9;80H- line wrapping in a bounded region"
+                               L"\x1b[10;80H- cursor targeting per scene");
+
+    *lphCursorRegion = hRegionLog;
+    return S_OK;
 }
 
-static VOID BringDemoRegionToFront(_In_ GuiTerminal::Control* lpGuiTerminal, _In_ GuiTerminal::RegionHandle hRegion) noexcept
+static HRESULT InitializeBoxesScene(_In_ GuiTerminal::Control* lpGuiTerminal, _In_ GuiTerminal::RegionHandle hRegionScene,
+                                    _Out_ GuiTerminal::RegionHandle* lphCursorRegion) noexcept
 {
-    if (!lpGuiTerminal || !hRegion)
+    if ((!lpGuiTerminal) || (!hRegionScene) || (!lphCursorRegion))
+    {
+        return E_POINTER;
+    }
+
+    *lphCursorRegion = hRegionScene;
+    lpGuiTerminal->FillRegionArea(hRegionScene, 0, 0, DEMO_SCENE_WIDTH, DEMO_SCENE_HEIGHT, L' ', RGB(35U, 26U, 0U), RGB(48U, 34U, 0U),
+                                  GuiTerminal::Control::StyleNone);
+    lpGuiTerminal->DrawRegionBox(hRegionScene, 0, 0, DEMO_SCENE_WIDTH, DEMO_SCENE_HEIGHT,
+                                 GuiTerminal::Control::BoxSideTopDouble | GuiTerminal::Control::BoxSideBottomDouble,
+                                 RGB(255U, 210U, 120U), RGB(48U, 34U, 0U), GuiTerminal::Control::StyleNone);
+    lpGuiTerminal->WriteRegion(hRegionScene,
+                               L"\x1b[1;4H\x1b[48;2;48;34;0m\x1b[1;97m Boxes and crossing lines \x1b[0m"
+                               L"\x1b[2;3HGlobal-style drawing helpers also work inside a full overlay region.");
+
+    lpGuiTerminal->DrawRegionBox(hRegionScene, 4, 4, 42, 9,
+                                 GuiTerminal::Control::BoxSideLeftDouble | GuiTerminal::Control::BoxSideTopDouble,
+                                 RGB(255U, 220U, 150U), RGB(72U, 48U, 0U), GuiTerminal::Control::StyleNone);
+    lpGuiTerminal->DrawRegionBox(hRegionScene, 18, 6, 36, 7,
+                                 GuiTerminal::Control::BoxSideRightDouble | GuiTerminal::Control::BoxSideBottomDouble,
+                                 RGB(255U, 240U, 200U), RGB(90U, 58U, 0U), GuiTerminal::Control::StyleNone);
+    lpGuiTerminal->DrawRegionHorizontalLine(hRegionScene, 8, 8, 70, GuiTerminal::Control::StrokeSingleLine, RGB(255U, 230U, 170U),
+                                            RGB(48U, 34U, 0U), GuiTerminal::Control::StyleNone);
+    lpGuiTerminal->DrawRegionVerticalLine(hRegionScene, 28, 3, 11, GuiTerminal::Control::StrokeDoubleLine, RGB(255U, 245U, 200U),
+                                          RGB(48U, 34U, 0U), GuiTerminal::Control::StyleNone);
+    lpGuiTerminal->DrawRegionHorizontalLine(hRegionScene, 82, 5, 44, GuiTerminal::Control::StrokeShadeLight, RGB(240U, 240U, 240U),
+                                            RGB(48U, 34U, 0U), GuiTerminal::Control::StyleNone);
+    lpGuiTerminal->DrawRegionHorizontalLine(hRegionScene, 82, 7, 44, GuiTerminal::Control::StrokeShadeMedium, RGB(240U, 240U, 240U),
+                                            RGB(48U, 34U, 0U), GuiTerminal::Control::StyleNone);
+    lpGuiTerminal->DrawRegionHorizontalLine(hRegionScene, 82, 9, 44, GuiTerminal::Control::StrokeShadeDark, RGB(240U, 240U, 240U),
+                                            RGB(48U, 34U, 0U), GuiTerminal::Control::StyleNone);
+    lpGuiTerminal->DrawRegionHorizontalLine(hRegionScene, 82, 11, 44, GuiTerminal::Control::StrokeSolidBlock, RGB(240U, 240U, 240U),
+                                            RGB(48U, 34U, 0U), GuiTerminal::Control::StyleNone);
+    lpGuiTerminal->DrawRegionVerticalLine(hRegionScene, 112, 4, 9, GuiTerminal::Control::StrokeSingleLine, RGB(180U, 225U, 255U),
+                                          RGB(48U, 34U, 0U), GuiTerminal::Control::StyleNone);
+    lpGuiTerminal->WriteRegion(hRegionScene,
+                               L"\x1b[6;8Hsingle + double joins"
+                               L"\x1b[10;10Hcrossing strokes"
+                               L"\x1b[5;84Hlight shade"
+                               L"\x1b[7;84Hmedium shade"
+                               L"\x1b[9;84Hdark shade"
+                               L"\x1b[11;84Hsolid block"
+                               L"\x1b[13;84Hmixed line families keep intersections");
+    return S_OK;
+}
+
+static HRESULT InitializeNestedScene(_In_ GuiTerminal::Control* lpGuiTerminal, _In_ GuiTerminal::RegionHandle hRegionScene,
+                                     _Out_ GuiTerminal::RegionHandle* lphCursorRegion) noexcept
+{
+    GuiTerminal::RegionHandle hRegionParent;
+    GuiTerminal::RegionHandle hRegionBack;
+    GuiTerminal::RegionHandle hRegionFront;
+    GuiTerminal::RegionHandle hRegionBadge;
+    HRESULT hr;
+
+    if ((!lpGuiTerminal) || (!hRegionScene) || (!lphCursorRegion))
+    {
+        return E_POINTER;
+    }
+
+    *lphCursorRegion = hRegionScene;
+    hRegionParent = nullptr;
+    hRegionBack = nullptr;
+    hRegionFront = nullptr;
+    hRegionBadge = nullptr;
+    lpGuiTerminal->FillRegionArea(hRegionScene, 0, 0, DEMO_SCENE_WIDTH, DEMO_SCENE_HEIGHT, L' ', RGB(18U, 18U, 18U), RGB(16U, 44U, 20U),
+                                  GuiTerminal::Control::StyleNone);
+    lpGuiTerminal->DrawRegionBox(hRegionScene, 0, 0, DEMO_SCENE_WIDTH, DEMO_SCENE_HEIGHT, GuiTerminal::Control::BoxSideRightDouble,
+                                 RGB(132U, 230U, 126U), RGB(16U, 44U, 20U), GuiTerminal::Control::StyleNone);
+    lpGuiTerminal->WriteRegion(hRegionScene,
+                               L"\x1b[1;4H\x1b[48;2;16;44;20m\x1b[1;97m Nested regions and local cursors \x1b[0m"
+                               L"\x1b[2;3HEach panel below is a real child region with its own clipping and write origin.");
+
+    hr = lpGuiTerminal->CreateRegion(8, 4, 54, 10, &hRegionParent, hRegionScene);
+    if (FAILED(hr))
+    {
+        return hr;
+    }
+    hr = lpGuiTerminal->CreateRegion(4, 2, 24, 6, &hRegionBack, hRegionParent);
+    if (FAILED(hr))
+    {
+        return hr;
+    }
+    hr = lpGuiTerminal->CreateRegion(18, 3, 24, 5, &hRegionFront, hRegionParent);
+    if (FAILED(hr))
+    {
+        return hr;
+    }
+    hr = lpGuiTerminal->CreateRegion(5, 1, 12, 3, &hRegionBadge, hRegionFront);
+    if (FAILED(hr))
+    {
+        return hr;
+    }
+
+    lpGuiTerminal->FillRegionArea(hRegionParent, 0, 0, 54, 10, L' ', RGB(225U, 245U, 225U), RGB(24U, 62U, 28U),
+                                  GuiTerminal::Control::StyleNone);
+    lpGuiTerminal->DrawRegionBox(hRegionParent, 0, 0, 54, 10,
+                                 GuiTerminal::Control::BoxSideTopDouble | GuiTerminal::Control::BoxSideLeftDouble,
+                                 RGB(225U, 255U, 225U), RGB(24U, 62U, 28U), GuiTerminal::Control::StyleNone);
+    lpGuiTerminal->WriteRegion(hRegionParent, L"\x1b[2;3HParent region");
+
+    lpGuiTerminal->FillRegionArea(hRegionBack, 0, 0, 24, 6, L' ', RGB(20U, 20U, 20U), RGB(220U, 226U, 228U),
+                                  GuiTerminal::Control::StyleNone);
+    lpGuiTerminal->DrawRegionBox(hRegionBack, 0, 0, 24, 6, GuiTerminal::Control::BoxSideBottomDouble, RGB(20U, 20U, 20U),
+                                 RGB(220U, 226U, 228U), GuiTerminal::Control::StyleNone);
+    lpGuiTerminal->WriteRegion(hRegionBack, L"\x1b[2;3Hback child\r\n\x1b[4;3Hcursor target A");
+
+    lpGuiTerminal->FillRegionArea(hRegionFront, 0, 0, 24, 5, L' ', RGB(30U, 20U, 0U), RGB(255U, 228U, 130U),
+                                  GuiTerminal::Control::StyleNone);
+    lpGuiTerminal->DrawRegionBox(hRegionFront, 0, 0, 24, 5,
+                                 GuiTerminal::Control::BoxSideTopDouble | GuiTerminal::Control::BoxSideRightDouble,
+                                 RGB(50U, 32U, 0U), RGB(255U, 228U, 130U), GuiTerminal::Control::StyleNone);
+    lpGuiTerminal->WriteRegion(hRegionFront, L"\x1b[2;3Hfront child\r\n\x1b[4;3Hcursor target B");
+
+    lpGuiTerminal->FillRegionArea(hRegionBadge, 0, 0, 12, 3, L' ', RGB(255U, 255U, 255U), RGB(180U, 56U, 56U),
+                                  GuiTerminal::Control::StyleNone);
+    lpGuiTerminal->DrawRegionBox(hRegionBadge, 0, 0, 12, 3,
+                                 GuiTerminal::Control::BoxSideTopDouble | GuiTerminal::Control::BoxSideBottomDouble,
+                                 RGB(255U, 255U, 255U), RGB(180U, 56U, 56U), GuiTerminal::Control::StyleNone);
+    lpGuiTerminal->WriteRegion(hRegionBadge, L"\x1b[2;3Hbadge");
+
+    lpGuiTerminal->WriteRegion(hRegionScene,
+                               L"\x1b[6;72HVisible layering:"
+                               L"\x1b[8;72H- parent host"
+                               L"\x1b[9;72H- back child"
+                               L"\x1b[10;72H- front child"
+                               L"\x1b[11;72H- grandchild badge");
+
+    *lphCursorRegion = hRegionBadge;
+    return S_OK;
+}
+
+static HRESULT InitializeMoveScene(_In_ GuiTerminal::Control* lpGuiTerminal, _In_ GuiTerminal::RegionHandle hRegionScene,
+                                   _Out_ GuiTerminal::RegionHandle* lphCursorRegion) noexcept
+{
+    GuiTerminal::RegionHandle hRegionPanel;
+    HRESULT hr;
+
+    if ((!lpGuiTerminal) || (!hRegionScene) || (!lphCursorRegion))
+    {
+        return E_POINTER;
+    }
+
+    *lphCursorRegion = hRegionScene;
+    hRegionPanel = nullptr;
+    lpGuiTerminal->FillRegionArea(hRegionScene, 0, 0, DEMO_SCENE_WIDTH, DEMO_SCENE_HEIGHT, L' ', RGB(245U, 235U, 255U), RGB(52U, 18U, 72U),
+                                  GuiTerminal::Control::StyleNone);
+    lpGuiTerminal->DrawRegionBox(hRegionScene, 0, 0, DEMO_SCENE_WIDTH, DEMO_SCENE_HEIGHT,
+                                 GuiTerminal::Control::BoxSideLeftDouble | GuiTerminal::Control::BoxSideRightDouble,
+                                 RGB(220U, 180U, 255U), RGB(52U, 18U, 72U), GuiTerminal::Control::StyleNone);
+    lpGuiTerminal->WriteRegion(hRegionScene,
+                               L"\x1b[1;4H\x1b[48;2;52;18;72m\x1b[1;97m Move and MoveRegion \x1b[0m"
+                               L"\x1b[2;3HThis scene includes in-bounds and clipped moves so vacated cells stay obvious.");
+
+    lpGuiTerminal->FillRegionArea(hRegionScene, 6, 4, 36, 3, L'.', RGB(220U, 200U, 255U), RGB(76U, 28U, 102U),
+                                  GuiTerminal::Control::StyleNone);
+    lpGuiTerminal->WriteRegion(hRegionScene, L"\x1b[5;9HSOURCE CELLS");
+    lpGuiTerminal->MoveRegion(hRegionScene, 6, 4, 14, 1, 26, 6, L'=', RGB(255U, 240U, 180U), RGB(52U, 18U, 72U),
+                              GuiTerminal::Control::StyleBold);
+    lpGuiTerminal->WriteRegion(hRegionScene, L"\x1b[8;9HMoveRegion() leaves '=' behind");
+    lpGuiTerminal->FillRegionArea(hRegionScene, 124, 4, 24, 3, L'~', RGB(255U, 232U, 255U), RGB(112U, 36U, 140U),
+                                  GuiTerminal::Control::StyleNone);
+    lpGuiTerminal->WriteRegion(hRegionScene, L"\x1b[5;127HCLIP RIGHT");
+    lpGuiTerminal->WriteRegion(hRegionScene, L"\x1b[6;126Hsource >>>>>>>>");
+    lpGuiTerminal->MoveRegion(hRegionScene, 124, 4, 24, 3, 144, 5, L'!', RGB(255U, 210U, 160U), RGB(52U, 18U, 72U),
+                              GuiTerminal::Control::StyleBold);
+    lpGuiTerminal->FillRegionArea(hRegionScene, 4, 12, 20, 2, L'%', RGB(255U, 245U, 200U), RGB(94U, 38U, 120U),
+                                  GuiTerminal::Control::StyleNone);
+    lpGuiTerminal->WriteRegion(hRegionScene, L"\x1b[13;6HCLIP LEFT");
+    lpGuiTerminal->WriteRegion(hRegionScene, L"\x1b[14;6H<<<<<< source");
+    lpGuiTerminal->MoveRegion(hRegionScene, 4, 12, 20, 2, -5, 13, L'?', RGB(255U, 220U, 180U), RGB(52U, 18U, 72U),
+                              GuiTerminal::Control::StyleBold);
+    lpGuiTerminal->FillRegionArea(hRegionScene, 52, 11, 18, 4, L'@', RGB(255U, 240U, 220U), RGB(104U, 46U, 130U),
+                                  GuiTerminal::Control::StyleNone);
+    lpGuiTerminal->WriteRegion(hRegionScene, L"\x1b[12;55HCLIP BOTTOM");
+    lpGuiTerminal->WriteRegion(hRegionScene, L"\x1b[13;55Hvv source vv");
+    lpGuiTerminal->MoveRegion(hRegionScene, 52, 11, 18, 4, 58, 15, L'/', RGB(255U, 220U, 170U), RGB(52U, 18U, 72U),
+                              GuiTerminal::Control::StyleBold);
+
+    hr = lpGuiTerminal->CreateRegion(82, 9, 48, 6, &hRegionPanel, hRegionScene);
+    if (FAILED(hr))
+    {
+        return hr;
+    }
+
+    lpGuiTerminal->FillRegionArea(hRegionPanel, 0, 0, 48, 6, L'+', RGB(24U, 24U, 24U), RGB(214U, 184U, 238U),
+                                  GuiTerminal::Control::StyleNone);
+    lpGuiTerminal->DrawRegionBox(hRegionPanel, 0, 0, 48, 6,
+                                 GuiTerminal::Control::BoxSideTopDouble | GuiTerminal::Control::BoxSideBottomDouble,
+                                 RGB(40U, 20U, 60U), RGB(214U, 184U, 238U), GuiTerminal::Control::StyleNone);
+    lpGuiTerminal->WriteRegion(hRegionPanel, L"\x1b[2;3Hchild panel");
+    lpGuiTerminal->WriteRegion(hRegionPanel, L"\x1b[3;29Hclip top");
+    lpGuiTerminal->WriteRegion(hRegionPanel, L"\x1b[4;4Hmove me");
+    lpGuiTerminal->WriteRegion(hRegionPanel, L"\x1b[4;29H^^^^^^");
+    lpGuiTerminal->MoveRegion(hRegionPanel, 3, 3, 7, 1, 37, 4, L'#', RGB(70U, 30U, 96U), RGB(214U, 184U, 238U),
+                              GuiTerminal::Control::StyleBold);
+    lpGuiTerminal->MoveRegion(hRegionPanel, 28, 1, 14, 2, 40, -1, L'$', RGB(80U, 30U, 100U), RGB(214U, 184U, 238U),
+                              GuiTerminal::Control::StyleBold);
+
+    *lphCursorRegion = hRegionPanel;
+    return S_OK;
+}
+
+static VOID SelectScene(_In_ GuiTerminal::Control* lpGuiTerminal, _In_ INT iSceneIndex) noexcept
+{
+    GuiTerminal::RegionHandle hRegionCursor;
+
+    if ((!lpGuiTerminal) || (iSceneIndex < 0) || (iSceneIndex >= DEMO_SCENE_COUNT))
     {
         return;
     }
 
-    lpGuiTerminal->BringRegionToFront(hRegion);
+    g_sDemoState.iActiveScene = iSceneIndex;
+    lpGuiTerminal->BringRegionToFront(g_sDemoState.arrScenes[iSceneIndex].hRegion);
+    DrawButtons(lpGuiTerminal);
+    lpGuiTerminal->SetCursorStyle(g_sDemoState.arrScenes[iSceneIndex].cursorStyle);
+    hRegionCursor = g_sDemoState.arrScenes[iSceneIndex].hCursorRegion;
+    lpGuiTerminal->ShowCursor(hRegionCursor ? hRegionCursor : g_sDemoState.arrScenes[iSceneIndex].hRegion);
 }
 
-static GuiTerminal::RegionHandle HitTestDemoRegion(_In_ INT iCol, _In_ INT iRow) noexcept
+static INT HitTestButton(_In_ INT iCol, _In_ INT iRow) noexcept
 {
-    GuiTerminal::RegionHandle hRegionCurrent;
-    DemoRegionMotion* lpsMotion;
+    INT iButtonX;
+    INT iButtonY;
+    INT iButtonWidth;
+    INT iButtonHeight;
+    INT iSceneIndex;
 
     if (iCol < 0 || iRow < 0)
     {
-        return nullptr;
+        return -1;
     }
 
-    if (!g_sDemoState.lpGuiTerminal)
+    for (iSceneIndex = 0; iSceneIndex < DEMO_SCENE_COUNT; iSceneIndex++)
     {
-        return nullptr;
-    }
-
-    for (hRegionCurrent = g_sDemoState.lpGuiTerminal->GetFirstRegion(); hRegionCurrent;
-         hRegionCurrent = g_sDemoState.lpGuiTerminal->GetNextRegion(hRegionCurrent))
-    {
-        lpsMotion = GetMotionForRegion(hRegionCurrent);
-        if (IsCellInsideMotion(lpsMotion, iCol, iRow) != FALSE)
+        GetButtonRect(iSceneIndex, &iButtonX, &iButtonY, &iButtonWidth, &iButtonHeight);
+        if ((iCol >= iButtonX) && (iCol < (iButtonX + iButtonWidth)) &&
+            (iRow >= iButtonY) && (iRow < (iButtonY + iButtonHeight)))
         {
-            return hRegionCurrent;
+            return iSceneIndex;
         }
     }
-    return nullptr;
+    return -1;
 }
 
-static BOOL IsCellInsideMotion(_In_ const DemoRegionMotion* lpsMotion, _In_ INT iCol, _In_ INT iRow) noexcept
+static VOID GetButtonRect(_In_ INT iSceneIndex, _Out_ LPINT lpiX, _Out_ LPINT lpiY,
+                          _Out_ LPINT lpiWidth, _Out_ LPINT lpiHeight) noexcept
 {
-    if (!lpsMotion || !lpsMotion->hRegion)
+    if (lpiX)
     {
-        return FALSE;
+        *lpiX = DEMO_BUTTON_X + (iSceneIndex * (DEMO_BUTTON_WIDTH + DEMO_BUTTON_GAP));
+    }
+    if (lpiY)
+    {
+        *lpiY = DEMO_BUTTON_Y;
+    }
+    if (lpiWidth)
+    {
+        *lpiWidth = DEMO_BUTTON_WIDTH;
+    }
+    if (lpiHeight)
+    {
+        *lpiHeight = DEMO_BUTTON_HEIGHT;
+    }
+}
+
+static VOID WriteCenteredText(_In_ GuiTerminal::Control* lpGuiTerminal, _In_ INT iCol, _In_ INT iRow, _In_ INT iWidth,
+                              _In_z_ LPCWSTR szTextW, _In_ COLORREF crForeground, _In_ COLORREF crBackground,
+                              _In_ BOOL bBold) noexcept
+{
+    INT iTextLength;
+    INT iStartCol;
+
+    if ((!lpGuiTerminal) || (!szTextW))
+    {
+        return;
     }
 
-    return ((iCol >= lpsMotion->iX) && (iCol < (lpsMotion->iX + lpsMotion->iWidth)) &&
-            (iRow >= lpsMotion->iY) && (iRow < (lpsMotion->iY + lpsMotion->iHeight))) ? TRUE : FALSE;
+    iTextLength = static_cast<INT>(wcslen(szTextW));
+    iStartCol = iCol + ((iWidth - iTextLength) / 2);
+    if (iStartCol < iCol)
+    {
+        iStartCol = iCol;
+    }
+
+    lpGuiTerminal->Print(L"\x1b[%d;%dH\x1b[38;2;%u;%u;%um\x1b[48;2;%u;%u;%um%ls%ls\x1b[0m",
+                         iRow + 1, iStartCol + 1,
+                         static_cast<unsigned>(GetRValue(crForeground)), static_cast<unsigned>(GetGValue(crForeground)),
+                         static_cast<unsigned>(GetBValue(crForeground)),
+                         static_cast<unsigned>(GetRValue(crBackground)), static_cast<unsigned>(GetGValue(crBackground)),
+                         static_cast<unsigned>(GetBValue(crBackground)),
+                         (bBold != FALSE) ? L"\x1b[1m" : L"", szTextW);
 }
 
 static VOID WriteMouseStatus(_In_ GuiTerminal::Control* lpGuiTerminal, _In_z_ LPCWSTR szButtonNameW, _In_z_ LPCWSTR szActionNameW,
@@ -620,15 +857,15 @@ static VOID WriteMouseStatus(_In_ GuiTerminal::Control* lpGuiTerminal, _In_z_ LP
 {
     WCHAR szBufferW[256];
 
-    if (!lpGuiTerminal || !g_sDemoMouseCallbackContext.hRegionStatus)
+    if ((!lpGuiTerminal) || (!g_sDemoState.hRegionStatus))
     {
         return;
     }
 
-    swprintf_s(szBufferW, sizeof(szBufferW) / sizeof(szBufferW[0]), L"%-6ls %-4ls col=%d row=%d px=(%d,%d)",
+    swprintf_s(szBufferW, sizeof(szBufferW) / sizeof(szBufferW[0]),
+               L"\x1b[1;1H\x1b[100;97m Mouse events \x1b[0m %-6ls %-4ls col=%d row=%d px=(%d,%d)",
                szButtonNameW, szActionNameW, iCol, iRow, iX, iY);
 
-    lpGuiTerminal->ClearRegion(g_sDemoMouseCallbackContext.hRegionStatus);
-    lpGuiTerminal->WriteRegion(g_sDemoMouseCallbackContext.hRegionStatus, L"\x1b[100;97m Mouse events \x1b[0m\r\n");
-    lpGuiTerminal->WriteRegion(g_sDemoMouseCallbackContext.hRegionStatus, szBufferW);
+    lpGuiTerminal->ClearRegion(g_sDemoState.hRegionStatus);
+    lpGuiTerminal->WriteRegion(g_sDemoState.hRegionStatus, szBufferW);
 }

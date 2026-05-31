@@ -104,6 +104,13 @@ sConfig = GuiTerminal::Control::Config{};
 - Use parentheses to clarify precedence, not mechanically around every subexpression.
 - Avoid redundant parentheses in simple homogeneous boolean chains such as `a && b && c` or `a || b || c` when precedence is obvious.
 - Add parentheses when mixing `&&` and `||` in the same expression.
+- Wrap unary negation subexpressions in parentheses when they appear alongside other boolean terms, including expressions with more than two subexpressions:
+  `if ((!var1) || (!var2))`
+  `if (var1 && (!var2))`
+  `if (var1 && (!var2) && var3)`
+  `if ((!var1) || var2 || (!var3))`
+- A standalone negation does not need extra grouping:
+  `if (!var)`
 - Add parentheses when a unary operator such as `!` applies to only part of a larger expression and the scope could be misread.
 - Prefer `if ((!ptr) || (*ptr == 0))` over `if (!ptr || *ptr == 0)` when the grouped intent is clearer.
 - Prefer `return ((a && b) || (c && d)) ? TRUE : FALSE;` over
@@ -115,6 +122,8 @@ sConfig = GuiTerminal::Control::Config{};
 - Do not expose implementation details from `src/` through public headers unless the API change requires it.
 - Preserve namespace structure and the distinction between public API types and `Internals`.
 - For DLL export/import macros, follow the existing preprocessor style in `include/GuiTerminalC.h`.
+- When the exported C API changes, update all export surfaces in the same change:
+  `include/GuiTerminalC.h`, `src/GuiTerminalC.cpp`, and `GuiTerminal.def`.
 
 ## Build files
 - Keep CMake formatting consistent with the existing file:

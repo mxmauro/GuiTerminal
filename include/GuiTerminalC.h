@@ -46,6 +46,13 @@ enum GuiTerminalBoxSideFlags
     GuiTerminalBoxSideLeftDouble = 1U << 3
 };
 
+enum GuiTerminalCursorStyle
+{
+    GuiTerminalCursorBlock = 0U,
+    GuiTerminalCursorUnderscore,
+    GuiTerminalCursorBarLeft
+};
+
 typedef struct GuiTerminalControlConfig
 {
     INT iRows;
@@ -79,6 +86,10 @@ GUITERMINAL_CONTROL_API
 VOID GuiTerminalControl_FillArea(_In_ GuiTerminalControl* lpControl, _In_ INT iX, _In_ INT iY, _In_ INT iWidth, _In_ INT iHeight,
                                  _In_ WCHAR chCodepointW, _In_ COLORREF crForeground, _In_ COLORREF crBackground, _In_ DWORD dwStyleFlags);
 GUITERMINAL_CONTROL_API
+VOID GuiTerminalControl_Move(_In_ GuiTerminalControl* lpControl, _In_ INT iSourceX, _In_ INT iSourceY, _In_ INT iWidth, _In_ INT iHeight,
+                             _In_ INT iTargetX, _In_ INT iTargetY, _In_ WCHAR chFillW, _In_ COLORREF crForeground,
+                             _In_ COLORREF crBackground, _In_ DWORD dwStyleFlags);
+GUITERMINAL_CONTROL_API
 VOID GuiTerminalControl_DrawHorizontalLine(_In_ GuiTerminalControl* lpControl, _In_ INT iX, _In_ INT iY, _In_ INT iWidth,
                                            _In_ GuiTerminalStrokeType strokeType, _In_ COLORREF crForeground, _In_ COLORREF crBackground,
                                            _In_ DWORD dwStyleFlags);
@@ -102,7 +113,7 @@ PVOID GuiTerminalControl_GetContext(_In_ const GuiTerminalControl *lpControl);
 
 GUITERMINAL_CONTROL_API
 HRESULT GuiTerminalControl_CreateRegion(_In_ GuiTerminalControl* lpControl, _In_ INT iX, _In_ INT iY, _In_ INT iWidth, _In_ INT iHeight,
-                                        _Out_ GuiTerminalRegion* lphRegion);
+                                        _Out_ GuiTerminalRegion* lphRegion, _In_opt_ GuiTerminalRegion hRegionParent);
 GUITERMINAL_CONTROL_API
 VOID GuiTerminalControl_ClearRegion(_In_ GuiTerminalControl* lpControl, _In_ GuiTerminalRegion hRegion);
 GUITERMINAL_CONTROL_API
@@ -113,6 +124,10 @@ GUITERMINAL_CONTROL_API
 VOID GuiTerminalControl_FillRegionArea(_In_ GuiTerminalControl* lpControl, _In_ GuiTerminalRegion hRegion, _In_ INT iX, _In_ INT iY,
                                        _In_ INT iWidth, _In_ INT iHeight, _In_ WCHAR chCodepointW, _In_ COLORREF crForeground,
                                        _In_ COLORREF crBackground, _In_ DWORD dwStyleFlags);
+GUITERMINAL_CONTROL_API
+VOID GuiTerminalControl_MoveRegion(_In_ GuiTerminalControl* lpControl, _In_ GuiTerminalRegion hRegion, _In_ INT iSourceX, _In_ INT iSourceY,
+                                   _In_ INT iWidth, _In_ INT iHeight, _In_ INT iTargetX, _In_ INT iTargetY, _In_ WCHAR chFillW,
+                                   _In_ COLORREF crForeground, _In_ COLORREF crBackground, _In_ DWORD dwStyleFlags);
 GUITERMINAL_CONTROL_API
 VOID GuiTerminalControl_DrawRegionHorizontalLine(_In_ GuiTerminalControl* lpControl, _In_ GuiTerminalRegion hRegion, _In_ INT iX,
                                                  _In_ INT iY, _In_ INT iWidth, _In_ GuiTerminalStrokeType strokeType,
@@ -153,22 +168,43 @@ GuiTerminalRegion GuiTerminalControl_GetFirstRegion(_In_ const GuiTerminalContro
 GUITERMINAL_CONTROL_API
 GuiTerminalRegion GuiTerminalControl_GetLastRegion(_In_ const GuiTerminalControl *lpControl);
 GUITERMINAL_CONTROL_API
+// Returns the next region toward the back within the same sibling list, or the first root child when the handle is null.
 GuiTerminalRegion GuiTerminalControl_GetNextRegion(_In_ const GuiTerminalControl *lpControl, _In_opt_ GuiTerminalRegion hRegion);
 GUITERMINAL_CONTROL_API
+// Returns the previous region toward the front within the same sibling list, or the last root child when the handle is null.
 GuiTerminalRegion GuiTerminalControl_GetPreviousRegion(_In_ const GuiTerminalControl *lpControl, _In_opt_ GuiTerminalRegion hRegion);
+GUITERMINAL_CONTROL_API
+// Returns the frontmost child of the specified parent, or the frontmost root child when the handle is null.
+GuiTerminalRegion GuiTerminalControl_GetChildFirstRegion(_In_ const GuiTerminalControl *lpControl, _In_opt_ GuiTerminalRegion hRegionParent);
+GUITERMINAL_CONTROL_API
+// Returns the backmost child of the specified parent, or the backmost root child when the handle is null.
+GuiTerminalRegion GuiTerminalControl_GetChildLastRegion(_In_ const GuiTerminalControl *lpControl, _In_opt_ GuiTerminalRegion hRegionParent);
+GUITERMINAL_CONTROL_API
+// Returns the immediate parent region, or null when the parent is the terminal root.
+GuiTerminalRegion GuiTerminalControl_GetParentRegion(_In_ const GuiTerminalControl *lpControl, _In_ GuiTerminalRegion hRegion);
 GUITERMINAL_CONTROL_API
 VOID GuiTerminalControl_GetRegionLocation(_In_ GuiTerminalControl *lpControl, _In_ GuiTerminalRegion hRegion, _Out_opt_ LPINT lpiX,
                                           _Out_opt_ LPINT lpiY, _Out_opt_ LPINT lpiWidth, _Out_opt_ LPINT lpiHeight);
 GUITERMINAL_CONTROL_API
 VOID GuiTerminalControl_GetTerminalSize(_In_ const GuiTerminalControl *lpControl, _Out_opt_ LPINT lpiCols, _Out_opt_ LPINT lpiRows);
 GUITERMINAL_CONTROL_API
+// Translate zero-based terminal coordinates to zero-based region coordinates for a specific region.
+// Returns FALSE only when the region handle is invalid.
 BOOL GuiTerminalControl_ConvertToRegionCoordinates(_In_ GuiTerminalControl *lpControl, _In_ GuiTerminalRegion hRegion,
                                                    _In_ INT iColTerminal, _In_ INT iRowTerminal, _Out_opt_ LPINT lpiColRegion,
                                                    _Out_opt_ LPINT lpiRowRegion);
 GUITERMINAL_CONTROL_API
+// Translate zero-based region coordinates to zero-based terminal coordinates for a specific region.
+// Returns FALSE when the region handle is invalid or the translated result cannot fit in INT.
 BOOL GuiTerminalControl_ConvertFromRegionCoordinates(_In_ GuiTerminalControl *lpControl, _In_ GuiTerminalRegion hRegion,
                                                      _In_ INT iColRegion, _In_ INT iRowRegion, _Out_opt_ LPINT lpiColTerminal,
                                                      _Out_opt_ LPINT lpiRowTerminal);
+GUITERMINAL_CONTROL_API
+VOID GuiTerminalControl_ShowCursor(_In_ GuiTerminalControl *lpControl, _In_opt_ GuiTerminalRegion hRegion);
+GUITERMINAL_CONTROL_API
+VOID GuiTerminalControl_HideCursor(_In_ GuiTerminalControl *lpControl);
+GUITERMINAL_CONTROL_API
+VOID GuiTerminalControl_SetCursorStyle(_In_ GuiTerminalControl *lpControl, _In_ GuiTerminalCursorStyle cursorStyle);
 
 GUITERMINAL_CONTROL_API
 HRESULT GuiTerminalControl_ResizeTerminal(_In_ GuiTerminalControl* lpControl, _In_ INT iCols, _In_ INT iRows);

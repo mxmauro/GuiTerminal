@@ -49,13 +49,14 @@ namespace GuiTerminal
             return hr;
         }
 
-        if (SetTimer(hWnd, 1U, 500U, nullptr) == 0U)
-        {
-            delete lpControl;
-            return HRESULT_FROM_WIN32(GetLastError());
-        }
-
         SetWindowLongPtrW(hWnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(lpControl));
+        hr = lpControl->StartBlinkThread();
+        if (FAILED(hr))
+        {
+            SetWindowLongPtrW(hWnd, GWLP_USERDATA, 0);
+            delete lpControl;
+            return hr;
+        }
 
         *lplpControl = lpControl;
         return S_OK;
@@ -96,6 +97,10 @@ namespace GuiTerminal
 
                     return TRUE;
                 }
+
+            case WindowMessageBlinkRedraw:
+                InvalidateRect(hWnd, nullptr, FALSE);
+                return TRUE;
 
             case WM_SIZE:
                 {
@@ -184,20 +189,8 @@ namespace GuiTerminal
                 }
                 break;
 
-            case WM_TIMER:
-                if (static_cast<UINT_PTR>(wParam) == lpControl->m_uiBlinkTimerId)
-                {
-                    lpControl->ToggleBlink();
-                    InvalidateRect(hWnd, nullptr, FALSE);
-                    return TRUE;
-                }
-                break;
-
             case WM_NCDESTROY:
-                if (lpControl->m_uiBlinkTimerId != 0)
-                {
-                    KillTimer(hWnd, lpControl->m_uiBlinkTimerId);
-                }
+                lpControl->StopBlinkThread();
                 if (GetCapture() == hWnd)
                 {
                     ReleaseCapture();
@@ -239,6 +232,18 @@ namespace GuiTerminal
         if (iWidth > 0 && iHeight > 0)
         {
             m_sBuffer.FillArea(nullptr, iX, iY, iWidth, iHeight, chCodepointW, crForeground, crBackground, dwStyleFlags);
+        }
+    }
+
+    VOID Control::Move(_In_ INT iSourceX, _In_ INT iSourceY, _In_ INT iWidth, _In_ INT iHeight, _In_ INT iTargetX, _In_ INT iTargetY,
+                       _In_ WCHAR chFillW, _In_ COLORREF crForeground, _In_ COLORREF crBackground, _In_ DWORD dwStyleFlags) noexcept
+    {
+        std::lock_guard<std::mutex> lockGuard(m_mutex);
+
+        if (iWidth > 0 && iHeight > 0)
+        {
+            m_sBuffer.MoveArea(nullptr, iSourceX, iSourceY, iWidth, iHeight, iTargetX, iTargetY, chFillW, crForeground, crBackground,
+                               dwStyleFlags);
         }
     }
 
@@ -323,7 +328,8 @@ namespace GuiTerminal
         return m_sBuffer.GetRegionContext(nullptr);
     }
 
-    HRESULT Control::CreateRegion(_In_ INT iX, _In_ INT iY, _In_ INT iWidth, _In_ INT iHeight, _Out_ RegionHandle* lphRegion) noexcept
+    HRESULT Control::CreateRegion(_In_ INT iX, _In_ INT iY, _In_ INT iWidth, _In_ INT iHeight, _Out_ RegionHandle* lphRegion,
+                                  _In_opt_ RegionHandle hRegionParent) noexcept
     {
         std::lock_guard<std::mutex> lockGuard(m_mutex);
 
@@ -335,7 +341,7 @@ namespace GuiTerminal
         {
             return E_INVALIDARG;
         }
-        return m_sBuffer.CreateRegion(iX, iY, iWidth, iHeight, lphRegion);
+        return m_sBuffer.CreateRegion(iX, iY, iWidth, iHeight, lphRegion, hRegionParent);
     }
 
     VOID Control::DestroyRegion(_In_ RegionHandle hRegion) noexcept
@@ -371,6 +377,19 @@ namespace GuiTerminal
         if (iWidth > 0 && iHeight > 0)
         {
             m_sBuffer.FillArea(hRegion, iX, iY, iWidth, iHeight, chCodepointW, crForeground, crBackground, dwStyleFlags);
+        }
+    }
+
+    VOID Control::MoveRegion(_In_opt_ RegionHandle hRegion, _In_ INT iSourceX, _In_ INT iSourceY, _In_ INT iWidth, _In_ INT iHeight,
+                             _In_ INT iTargetX, _In_ INT iTargetY, _In_ WCHAR chFillW, _In_ COLORREF crForeground,
+                             _In_ COLORREF crBackground, _In_ DWORD dwStyleFlags) noexcept
+    {
+        std::lock_guard<std::mutex> lockGuard(m_mutex);
+
+        if (iWidth > 0 && iHeight > 0)
+        {
+            m_sBuffer.MoveArea(hRegion, iSourceX, iSourceY, iWidth, iHeight, iTargetX, iTargetY, chFillW, crForeground, crBackground,
+                               dwStyleFlags);
         }
     }
 
@@ -533,6 +552,31 @@ namespace GuiTerminal
         return m_sBuffer.GetPreviousRegion(hRegion);
     }
 
+    RegionHandle Control::GetChildFirstRegion(_In_opt_ RegionHandle hRegionParent) const noexcept
+    {
+        std::lock_guard<std::mutex> lockGuard(m_mutex);
+
+        return m_sBuffer.GetChildFirstRegion(hRegionParent);
+    }
+
+    RegionHandle Control::GetChildLastRegion(_In_opt_ RegionHandle hRegionParent) const noexcept
+    {
+        std::lock_guard<std::mutex> lockGuard(m_mutex);
+
+        return m_sBuffer.GetChildLastRegion(hRegionParent);
+    }
+
+    RegionHandle Control::GetParentRegion(_In_ RegionHandle hRegion) const noexcept
+    {
+        std::lock_guard<std::mutex> lockGuard(m_mutex);
+
+        if (!hRegion)
+        {
+            return nullptr;
+        }
+        return m_sBuffer.GetParentRegion(hRegion);
+    }
+
     VOID Control::GetRegionLocation(_In_ RegionHandle hRegion, _Out_opt_ LPINT lpiX, _Out_opt_ LPINT lpiY, _Out_opt_ LPINT lpiWidth,
                                     _Out_opt_ LPINT lpiHeight) const noexcept
     {
@@ -598,6 +642,30 @@ namespace GuiTerminal
             return FALSE;
         }
         return m_sBuffer.ConvertFromRegionCoordinates(hRegion, iColRegion, iRowRegion, lpiColTerminal, lpiRowTerminal);
+    }
+
+    VOID Control::ShowCursor(_In_opt_ RegionHandle hRegion) noexcept
+    {
+        std::lock_guard<std::mutex> lockGuard(m_mutex);
+
+        m_sBuffer.ShowCursor(hRegion);
+        InvalidateRect(m_hWnd, nullptr, FALSE);
+    }
+
+    VOID Control::HideCursor() noexcept
+    {
+        std::lock_guard<std::mutex> lockGuard(m_mutex);
+
+        m_sBuffer.HideCursor();
+        InvalidateRect(m_hWnd, nullptr, FALSE);
+    }
+
+    VOID Control::SetCursorStyle(_In_ CursorStyle style) noexcept
+    {
+        std::lock_guard<std::mutex> lockGuard(m_mutex);
+
+        m_sBuffer.SetCursorStyle(style);
+        InvalidateRect(m_hWnd, nullptr, FALSE);
     }
 
     HRESULT Control::ResizeTerminal(_In_ INT iCols, _In_ INT iRows) noexcept
@@ -860,6 +928,80 @@ namespace GuiTerminal
         std::lock_guard<std::mutex> lockGuard(m_mutex);
 
         m_sBuffer.ToggleBlinkVisibility();
+    }
+
+    HRESULT Control::StartBlinkThread() noexcept
+    {
+        HRESULT hr;
+
+        m_hBlinkStopEvent = CreateEventW(nullptr, TRUE, FALSE, nullptr);
+        if (!m_hBlinkStopEvent)
+        {
+            return HRESULT_FROM_WIN32(GetLastError());
+        }
+
+        hr = S_OK;
+        try
+        {
+            m_threadBlink = std::thread(&Control::BlinkThreadEntry, this);
+        }
+        catch (const std::bad_alloc&)
+        {
+            hr = E_OUTOFMEMORY;
+        }
+        catch (...)
+        {
+            hr = E_UNEXPECTED;
+        }
+
+        if (FAILED(hr))
+        {
+            CloseHandle(m_hBlinkStopEvent);
+            m_hBlinkStopEvent = nullptr;
+        }
+        return hr;
+    }
+
+    VOID Control::StopBlinkThread() noexcept
+    {
+        if (m_hBlinkStopEvent)
+        {
+            SetEvent(m_hBlinkStopEvent);
+        }
+        if (m_threadBlink.joinable())
+        {
+            m_threadBlink.join();
+        }
+        if (m_hBlinkStopEvent)
+        {
+            CloseHandle(m_hBlinkStopEvent);
+            m_hBlinkStopEvent = nullptr;
+        }
+    }
+
+    VOID Control::BlinkThreadEntry(_In_ Control* lpControl) noexcept
+    {
+        DWORD dwWaitResult;
+
+        if ((!lpControl) || (!lpControl->m_hBlinkStopEvent))
+        {
+            return;
+        }
+
+        for (;;)
+        {
+            dwWaitResult = WaitForSingleObject(lpControl->m_hBlinkStopEvent, 500U);
+            if (dwWaitResult != WAIT_TIMEOUT)
+            {
+                break;
+            }
+
+            lpControl->ToggleBlink();
+            if (lpControl->m_hWnd)
+            {
+                PostMessageW(lpControl->m_hWnd, WindowMessageBlinkRedraw, 0U, 0L);
+            }
+        }
     }
 }
 

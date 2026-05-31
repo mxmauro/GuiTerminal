@@ -6,6 +6,7 @@ EXPORTS
     GuiTerminalControl_Clear
     GuiTerminalControl_Scroll
     GuiTerminalControl_FillArea
+    GuiTerminalControl_Move
     GuiTerminalControl_DrawHorizontalLine
     GuiTerminalControl_DrawVerticalLine
     GuiTerminalControl_DrawBox
@@ -19,6 +20,7 @@ EXPORTS
     GuiTerminalControl_ClearRegion
     GuiTerminalControl_ScrollRegion
     GuiTerminalControl_FillRegionArea
+    GuiTerminalControl_MoveRegion
     GuiTerminalControl_DrawRegionHorizontalLine
     GuiTerminalControl_DrawRegionVerticalLine
     GuiTerminalControl_DrawRegionBox
@@ -35,10 +37,16 @@ EXPORTS
     GuiTerminalControl_GetLastRegion
     GuiTerminalControl_GetNextRegion
     GuiTerminalControl_GetPreviousRegion
+    GuiTerminalControl_GetChildFirstRegion
+    GuiTerminalControl_GetChildLastRegion
+    GuiTerminalControl_GetParentRegion
     GuiTerminalControl_GetRegionLocation
     GuiTerminalControl_GetTerminalSize
     GuiTerminalControl_ConvertToRegionCoordinates
     GuiTerminalControl_ConvertFromRegionCoordinates
+    GuiTerminalControl_ShowCursor
+    GuiTerminalControl_HideCursor
+    GuiTerminalControl_SetCursorStyle
     GuiTerminalControl_ResizeTerminal
     GuiTerminalControl_GetCellSize
     GuiTerminalControl_GetCellPosition

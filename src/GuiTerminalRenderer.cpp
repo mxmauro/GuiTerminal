@@ -110,6 +110,7 @@ namespace GuiTerminal::Internals
                                                             PixelsToDipsX(m_rcViewport.right), PixelsToDipsY(m_rcViewport.bottom)),
                                                 D2D1_ANTIALIAS_MODE_PER_PRIMITIVE);
             DrawCells(sSnapshotBuffer);
+            DrawCursor(sSnapshotBuffer);
             m_renderTarget->PopAxisAlignedClip();
             DrawScrollBars(sSnapshotBuffer.crDefaultBackground);
             hr = m_renderTarget->EndDraw();
@@ -896,22 +897,8 @@ namespace GuiTerminal::Internals
         bTextVisible = ((sCellCurrent.dwStyleFlags & Control::StyleBlink) == 0U || sSnapshotBuffer.bBlinkVisible != FALSE) ? TRUE : FALSE;
         if ((bTextVisible != FALSE) && (sCellCurrent.chCodepointW != L' '))
         {
-            INT iStyle;
-
-            iStyle = 0;
-            if ((sCellCurrent.dwStyleFlags & Control::StyleBold) != 0U)
-            {
-                iStyle |= 1;
-            }
-            if ((sCellCurrent.dwStyleFlags & Control::StyleItalic) != 0U)
-            {
-                iStyle |= 2;
-            }
-
             rcText = rcBackground;
-            m_brush->SetColor(ToD2DColor(crForeground));
-            m_renderTarget->DrawTextW(&sCellCurrent.chCodepointW, 1, m_textFormat[iStyle].Get(), rcText, m_brush.Get(),
-                                      D2D1_DRAW_TEXT_OPTIONS_CLIP, DWRITE_MEASURING_MODE_NATURAL);
+            DrawGlyph(sCellCurrent.chCodepointW, sCellCurrent.dwStyleFlags, crForeground, rcText);
         }
 
         if ((sCellCurrent.dwStyleFlags & Control::StyleUnderline) != 0U)
@@ -925,6 +912,97 @@ namespace GuiTerminal::Internals
             m_brush->SetColor(ToD2DColor(crForeground));
             m_renderTarget->FillRectangle(rcUnderline, m_brush.Get());
         }
+    }
+
+    VOID Renderer::DrawCursor(_In_ const Buffer::Snapshot& sSnapshotBuffer) noexcept
+    {
+        const Buffer::Cell* lpsCellCurrent;
+        RECT rcCell;
+        D2D1_RECT_F rcCursor;
+        D2D1_RECT_F rcText;
+        COLORREF crForeground;
+        COLORREF crBackground;
+        INT iCursorBarHeight;
+        INT iCursorBarWidth;
+
+        if (sSnapshotBuffer.bCursorVisible == FALSE || sSnapshotBuffer.bBlinkVisible == FALSE)
+        {
+            return;
+        }
+        if (sSnapshotBuffer.iCursorCol < 0 || sSnapshotBuffer.iCursorCol >= sSnapshotBuffer.iCols ||
+            sSnapshotBuffer.iCursorRow < 0 || sSnapshotBuffer.iCursorRow >= sSnapshotBuffer.iRows)
+        {
+            return;
+        }
+
+        lpsCellCurrent = &sSnapshotBuffer.lpCells[static_cast<size_t>(sSnapshotBuffer.iCursorRow * sSnapshotBuffer.iCols + sSnapshotBuffer.iCursorCol)];
+        if ((lpsCellCurrent->dwStyleFlags & Control::StyleInverse) == 0U)
+        {
+            crForeground = lpsCellCurrent->crForeground;
+            crBackground = lpsCellCurrent->crBackground;
+        }
+        else
+        {
+            crForeground = lpsCellCurrent->crBackground;
+            crBackground = lpsCellCurrent->crForeground;
+        }
+
+        rcCell.left = m_iGridOffsetX + (m_metricsFont.iCellWidthPx * sSnapshotBuffer.iCursorCol);
+        rcCell.top = m_iGridOffsetY + (m_metricsFont.iCellHeightPx * sSnapshotBuffer.iCursorRow);
+        rcCell.right = rcCell.left + m_metricsFont.iCellWidthPx;
+        rcCell.bottom = rcCell.top + m_metricsFont.iCellHeightPx;
+        rcCursor = D2D1::RectF(PixelsToDipsX(rcCell.left), PixelsToDipsY(rcCell.top), PixelsToDipsX(rcCell.right),
+                               PixelsToDipsY(rcCell.bottom));
+
+        switch (sSnapshotBuffer.dwCursorStyle)
+        {
+            case Control::CursorBarLeft:
+                iCursorBarWidth = (std::max)(m_metricsFont.iUnderlineThicknessPx, 2);
+                rcCursor.right = PixelsToDipsX(rcCell.left + iCursorBarWidth);
+                m_brush->SetColor(ToD2DColor(crForeground));
+                m_renderTarget->FillRectangle(rcCursor, m_brush.Get());
+                break;
+
+            case Control::CursorUnderscore:
+                iCursorBarHeight = (std::max)(m_metricsFont.iUnderlineThicknessPx, 2);
+                iCursorBarHeight = (iCursorBarHeight * 3 + 1) / 2;
+                rcCursor.top = PixelsToDipsY(rcCell.bottom - iCursorBarHeight);
+                m_brush->SetColor(ToD2DColor(crForeground));
+                m_renderTarget->FillRectangle(rcCursor, m_brush.Get());
+                break;
+
+            case Control::CursorBlock:
+            default:
+                m_brush->SetColor(ToD2DColor(crForeground));
+                m_renderTarget->FillRectangle(rcCursor, m_brush.Get());
+                if (lpsCellCurrent->chCodepointW != L' ' &&
+                    (((lpsCellCurrent->dwStyleFlags & Control::StyleBlink) == 0U) || sSnapshotBuffer.bBlinkVisible != FALSE))
+                {
+                    rcText = rcCursor;
+                    DrawGlyph(lpsCellCurrent->chCodepointW, lpsCellCurrent->dwStyleFlags, crBackground, rcText);
+                }
+                break;
+        }
+    }
+
+    VOID Renderer::DrawGlyph(_In_ WCHAR chCodepointW, _In_ DWORD dwStyleFlags, _In_ COLORREF crForeground,
+                             _In_ const D2D1_RECT_F& rcText) noexcept
+    {
+        INT iStyle;
+
+        iStyle = 0;
+        if ((dwStyleFlags & Control::StyleBold) != 0U)
+        {
+            iStyle |= 1;
+        }
+        if ((dwStyleFlags & Control::StyleItalic) != 0U)
+        {
+            iStyle |= 2;
+        }
+
+        m_brush->SetColor(ToD2DColor(crForeground));
+        m_renderTarget->DrawTextW(&chCodepointW, 1, m_textFormat[iStyle].Get(), rcText, m_brush.Get(),
+                                  D2D1_DRAW_TEXT_OPTIONS_CLIP, DWRITE_MEASURING_MODE_NATURAL);
     }
 }
 

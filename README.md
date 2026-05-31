@@ -9,7 +9,7 @@ console window. Typical use cases include embedded shells, device consoles, deve
 log viewers, retro-style interfaces, and applications that want ANSI-style formatted text
 inside a standard Win32 GUI.
 
-![Demo screenshot](screenshot.webp "Demo screenshot")
+![Demo screenshot](screenshot.gif "Demo screenshot")
 
 ## Features
 

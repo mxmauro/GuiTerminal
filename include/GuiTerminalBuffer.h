@@ -36,6 +36,7 @@ namespace GuiTerminal
         struct Region_s
         {
             INT iId{};
+            struct Region_s* hRegionParent{ nullptr };
             INT iX{};
             INT iY{};
             INT iWidth{};
@@ -47,6 +48,7 @@ namespace GuiTerminal
             PVOID lpContext{ nullptr };
             Attributes sAttributesCurrent{};
             std::vector<Cell> vecCells;
+            std::vector<INT> vecChildRegionIds;
         };
     }
 
@@ -65,6 +67,10 @@ namespace GuiTerminal
                 INT iCols{};
                 INT iRows{};
                 BOOL bBlinkVisible{};
+                BOOL bCursorVisible{};
+                INT iCursorCol{};
+                INT iCursorRow{};
+                DWORD dwCursorStyle{};
                 COLORREF crDefaultForeground{};
                 COLORREF crDefaultBackground{};
             };
@@ -87,6 +93,9 @@ namespace GuiTerminal
             VOID FillArea(_In_opt_ RegionHandle hRegion, _In_ INT iX, _In_ INT iY, _In_ INT iWidth, _In_ INT iHeight,
                           _In_ WCHAR chCodepointW, _In_ COLORREF crForeground, _In_ COLORREF crBackground,
                           _In_ DWORD dwStyleFlags) noexcept;
+            VOID MoveArea(_In_opt_ RegionHandle hRegion, _In_ INT iSourceX, _In_ INT iSourceY, _In_ INT iWidth, _In_ INT iHeight,
+                          _In_ INT iTargetX, _In_ INT iTargetY, _In_ WCHAR chFillW, _In_ COLORREF crForeground,
+                          _In_ COLORREF crBackground, _In_ DWORD dwStyleFlags) noexcept;
             VOID DrawHorizontalLine(_In_opt_ RegionHandle hRegion, _In_ INT iX, _In_ INT iY, _In_ INT iWidth, _In_ DWORD dwStrokeType,
                                     _In_ COLORREF crForeground, _In_ COLORREF crBackground, _In_ DWORD dwStyleFlags) noexcept;
             VOID DrawVerticalLine(_In_opt_ RegionHandle hRegion, _In_ INT iX, _In_ INT iY, _In_ INT iHeight, _In_ DWORD dwStrokeType,
@@ -113,7 +122,8 @@ namespace GuiTerminal
             VOID SetGraphicsRendition(_In_opt_ RegionHandle hRegion, _In_reads_(uParamsCount) LPINT lpiParams,
                                       _In_ SIZE_T uParamsCount) noexcept;
 
-            HRESULT CreateRegion(_In_ INT iX, _In_ INT iY, _In_ INT iWidth, _In_ INT iHeight, _Out_ RegionHandle* lphRegion) noexcept;
+            HRESULT CreateRegion(_In_ INT iX, _In_ INT iY, _In_ INT iWidth, _In_ INT iHeight, _Out_ RegionHandle* lphRegion,
+                                 _In_opt_ RegionHandle hRegionParent) noexcept;
             HRESULT DestroyRegion(_In_ RegionHandle hRegion) noexcept;
 
             HRESULT RelocateRegion(_In_ RegionHandle hRegion, _In_ INT iX, _In_ INT iY, _In_ INT iWidth, _In_ INT iHeight) noexcept;
@@ -126,6 +136,9 @@ namespace GuiTerminal
             RegionHandle GetLastRegion() const noexcept;
             RegionHandle GetNextRegion(_In_opt_ RegionHandle hRegion) const noexcept;
             RegionHandle GetPreviousRegion(_In_opt_ RegionHandle hRegion) const noexcept;
+            RegionHandle GetChildFirstRegion(_In_opt_ RegionHandle hRegionParent) const noexcept;
+            RegionHandle GetChildLastRegion(_In_opt_ RegionHandle hRegionParent) const noexcept;
+            RegionHandle GetParentRegion(_In_ RegionHandle hRegion) const noexcept;
             VOID GetRegionLocation(_In_ RegionHandle hRegion, _Out_opt_ LPINT lpiX, _Out_opt_ LPINT lpiY, _Out_opt_ LPINT lpiWidth,
                                    _Out_opt_ LPINT lpiHeight) const noexcept;
             BOOL ConvertToRegionCoordinates(_In_ RegionHandle hRegion, _In_ INT iColTerminal, _In_ INT iRowTerminal,
@@ -136,6 +149,9 @@ namespace GuiTerminal
             VOID SaveCursor(_In_opt_ RegionHandle hRegion) noexcept;
             VOID RestoreCursor(_In_opt_ RegionHandle hRegion) noexcept;
 
+            VOID ShowCursor(_In_opt_ RegionHandle hRegion) noexcept;
+            VOID HideCursor() noexcept;
+            VOID SetCursorStyle(_In_ DWORD dwCursorStyle) noexcept;
             VOID ToggleBlinkVisibility() noexcept;
             VOID SetBlinkVisible(_In_ BOOL bBlinkVisible) noexcept;
 
@@ -146,6 +162,9 @@ namespace GuiTerminal
             HRESULT ValidateRegionBounds(_In_ INT iWidth, _In_ INT iHeight) const noexcept;
             Region_s* ResolveRegion(_In_opt_ RegionHandle hRegion) noexcept;
             const Region_s* ResolveRegion(_In_opt_ RegionHandle hRegion) const noexcept;
+            HRESULT RemoveRegionFromParent(_Inout_ Region_s& sRegion) noexcept;
+            HRESULT DestroyRegionRecursive(_In_ RegionHandle hRegion) noexcept;
+            BOOL GetRegionTerminalOrigin(_In_ const Region_s& sRegion, _Out_ long long* lpllX, _Out_ long long* lpllY) const noexcept;
 
             Cell MakeBlankCell() const noexcept;
             HRESULT InitializeRegionCells(_Inout_ Region_s& sRegion) const noexcept;
@@ -157,6 +176,8 @@ namespace GuiTerminal
             VOID FillCell(_Inout_ Region_s& sRegion, _In_ INT iX, _In_ INT iY, _In_ const Attributes& sAttributesCell) noexcept;
             VOID FillRange(_Inout_ Region_s& sRegion, _In_ INT iXStart, _In_ INT iYStart, _In_ INT iXEnd, _In_ INT iYEnd,
                            _In_ const Attributes& sAttributesCell) noexcept;
+            BOOL IsCoordinateInsideRectangle(_In_ INT iX, _In_ INT iY, _In_ INT iStartX, _In_ INT iStartY, _In_ INT iEndX,
+                                             _In_ INT iEndY) const noexcept;
             const Cell* GetCell(_In_ const Region_s& sRegion, _In_ INT iX, _In_ INT iY) const noexcept;
             VOID DrawStrokeCell(_Inout_ Region_s& sRegion, _In_ INT iX, _In_ INT iY, _In_ DWORD dwStrokeType, _In_ BYTE byUp,
                                 _In_ BYTE byRight, _In_ BYTE byDown, _In_ BYTE byLeft, _In_ const Attributes& sAttributesCell) noexcept;
@@ -170,7 +191,8 @@ namespace GuiTerminal
             VOID AdvanceCursorAfterWrite(_In_opt_ RegionHandle hRegion) noexcept;
 
             BOOL GetCellIndex(_In_ INT iX, _In_ INT iY, _In_ INT iWidth, _Out_ PSIZE_T lpuIndex) const noexcept;
-            VOID ComposeRegion(_In_ const Region_s& sRegion) const noexcept;
+            HRESULT ComposeRegion(_In_ const Region_s& sRegion) const noexcept;
+            HRESULT ComposeRegionTree(_In_ const Region_s& sRegionParent) const noexcept;
 
             VOID ApplySgrColor(_In_ RegionHandle hRegion, _In_reads_(uParamsCount) LPINT lpiParams, _In_ SIZE_T uParamsCount,
                                _Inout_ PSIZE_T lpuIndex, _In_ BOOL bForeground) noexcept;
@@ -182,9 +204,11 @@ namespace GuiTerminal
             mutable std::vector<Cell> m_vecSnapshotCells;
             Attributes m_sAttributesDefault{};
             std::unordered_map<INT, Region_s> m_mapRegions;
-            std::vector<INT> m_vecRegionOrder;
+            RegionHandle m_hRegionCursorActive{};
             INT m_iNextRegionId{ 1 };
             BOOL m_bBlinkVisible{ TRUE };
+            BOOL m_bCursorVisible{ FALSE };
+            DWORD m_dwCursorStyle{};
         };
     }
 }

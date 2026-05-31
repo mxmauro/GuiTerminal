@@ -32,6 +32,7 @@ edit scope guidance, or validation commands.
 - Keep the Win32-native design. Prefer `HRESULT`, `BOOL`, SAL, wide APIs, and the existing naming style.
 - Preserve the public/internal split: public interfaces in `include/`, implementation in `src/`.
 - When you change a public operation in C++, check whether the C wrapper and demo should change too.
+- When you change the exported C API, update `include/GuiTerminalC.h`, `src/GuiTerminalC.cpp`, and `GuiTerminal.def` together.
 - Treat the demo as a real consumer. If behavior changes materially, update or extend it.
 - Use `apply_patch` for edits, keep CRLF, and run `utils/fixeol.bat` on touched files before finishing.
 - Keep lines within the repo's 140-character limit and pack wrapped signatures/calls efficiently instead of using one-argument-per-line formatting by default.

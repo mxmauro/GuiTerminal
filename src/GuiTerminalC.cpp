@@ -78,6 +78,17 @@ VOID GuiTerminalControl_FillArea(_In_ GuiTerminalControl *lpControl, _In_ INT iX
     }
 }
 
+VOID GuiTerminalControl_Move(_In_ GuiTerminalControl *lpControl, _In_ INT iSourceX, _In_ INT iSourceY, _In_ INT iWidth, _In_ INT iHeight,
+                             _In_ INT iTargetX, _In_ INT iTargetY, _In_ WCHAR chFillW, _In_ COLORREF crForeground,
+                             _In_ COLORREF crBackground, _In_ DWORD dwStyleFlags)
+{
+    if (lpControl)
+    {
+        ToCppControl(lpControl)->Move(iSourceX, iSourceY, iWidth, iHeight, iTargetX, iTargetY, chFillW, crForeground, crBackground,
+                                      dwStyleFlags);
+    }
+}
+
 VOID GuiTerminalControl_DrawHorizontalLine(_In_ GuiTerminalControl *lpControl, _In_ INT iX, _In_ INT iY, _In_ INT iWidth,
                                            _In_ GuiTerminalStrokeType strokeType, _In_ COLORREF crForeground, _In_ COLORREF crBackground,
                                            _In_ DWORD dwStyleFlags)
@@ -156,7 +167,7 @@ PVOID GuiTerminalControl_GetContext(_In_ const GuiTerminalControl *lpControl)
 }
 
 HRESULT GuiTerminalControl_CreateRegion(_In_ GuiTerminalControl *lpControl, _In_ INT iX, _In_ INT iY, _In_ INT iWidth, _In_ INT iHeight,
-                                        _Out_ GuiTerminalRegion *lphRegion)
+                                        _Out_ GuiTerminalRegion *lphRegion, _In_opt_ GuiTerminalRegion hRegionParent)
 {
     GuiTerminal::RegionHandle hRegion;
     HRESULT hr;
@@ -172,7 +183,7 @@ HRESULT GuiTerminalControl_CreateRegion(_In_ GuiTerminalControl *lpControl, _In_
     }
 
     hRegion = nullptr;
-    hr = ToCppControl(lpControl)->CreateRegion(iX, iY, iWidth, iHeight, &hRegion);
+    hr = ToCppControl(lpControl)->CreateRegion(iX, iY, iWidth, iHeight, &hRegion, ToCppRegion(hRegionParent));
     if (SUCCEEDED(hr))
     {
         *lphRegion = ToCRegion(hRegion);
@@ -212,6 +223,17 @@ VOID GuiTerminalControl_FillRegionArea(_In_ GuiTerminalControl *lpControl, _In_ 
     {
         ToCppControl(lpControl)->FillRegionArea(ToCppRegion(hRegion), iX, iY, iWidth, iHeight, chCodepointW, crForeground, crBackground,
                                                 dwStyleFlags);
+    }
+}
+
+VOID GuiTerminalControl_MoveRegion(_In_ GuiTerminalControl *lpControl, _In_ GuiTerminalRegion hRegion, _In_ INT iSourceX, _In_ INT iSourceY,
+                                   _In_ INT iWidth, _In_ INT iHeight, _In_ INT iTargetX, _In_ INT iTargetY, _In_ WCHAR chFillW,
+                                   _In_ COLORREF crForeground, _In_ COLORREF crBackground, _In_ DWORD dwStyleFlags)
+{
+    if (lpControl)
+    {
+        ToCppControl(lpControl)->MoveRegion(ToCppRegion(hRegion), iSourceX, iSourceY, iWidth, iHeight, iTargetX, iTargetY, chFillW,
+                                            crForeground, crBackground, dwStyleFlags);
     }
 }
 
@@ -373,6 +395,33 @@ GuiTerminalRegion GuiTerminalControl_GetPreviousRegion(_In_ const GuiTerminalCon
     return ToCRegion(ToCppControl(lpControl)->GetPreviousRegion(ToCppRegion(hRegion)));
 }
 
+GuiTerminalRegion GuiTerminalControl_GetChildFirstRegion(_In_ const GuiTerminalControl *lpControl, _In_opt_ GuiTerminalRegion hRegionParent)
+{
+    if (!lpControl)
+    {
+        return nullptr;
+    }
+    return ToCRegion(ToCppControl(lpControl)->GetChildFirstRegion(ToCppRegion(hRegionParent)));
+}
+
+GuiTerminalRegion GuiTerminalControl_GetChildLastRegion(_In_ const GuiTerminalControl *lpControl, _In_opt_ GuiTerminalRegion hRegionParent)
+{
+    if (!lpControl)
+    {
+        return nullptr;
+    }
+    return ToCRegion(ToCppControl(lpControl)->GetChildLastRegion(ToCppRegion(hRegionParent)));
+}
+
+GuiTerminalRegion GuiTerminalControl_GetParentRegion(_In_ const GuiTerminalControl *lpControl, _In_ GuiTerminalRegion hRegion)
+{
+    if ((!lpControl) || (!hRegion))
+    {
+        return nullptr;
+    }
+    return ToCRegion(ToCppControl(lpControl)->GetParentRegion(ToCppRegion(hRegion)));
+}
+
 VOID GuiTerminalControl_GetRegionLocation(_In_ GuiTerminalControl *lpControl, _In_ GuiTerminalRegion hRegion, _Out_opt_ LPINT lpiX,
                                           _Out_opt_ LPINT lpiY, _Out_opt_ LPINT lpiWidth, _Out_opt_ LPINT lpiHeight)
 {
@@ -424,7 +473,7 @@ BOOL GuiTerminalControl_ConvertToRegionCoordinates(_In_ GuiTerminalControl *lpCo
                                                    _In_ INT iColTerminal, _In_ INT iRowTerminal, _Out_opt_ LPINT lpiColRegion,
                                                    _Out_opt_ LPINT lpiRowRegion)
 {
-    if (!lpControl || !hRegion)
+    if ((!lpControl) || (!hRegion))
     {
         if (lpiColRegion)
         {
@@ -445,7 +494,7 @@ BOOL GuiTerminalControl_ConvertFromRegionCoordinates(_In_ GuiTerminalControl *lp
                                                      _In_ INT iColRegion, _In_ INT iRowRegion, _Out_opt_ LPINT lpiColTerminal,
                                                      _Out_opt_ LPINT lpiRowTerminal)
 {
-    if (!lpControl || !hRegion)
+    if ((!lpControl) || (!hRegion))
     {
         if (lpiColTerminal)
         {
@@ -460,6 +509,30 @@ BOOL GuiTerminalControl_ConvertFromRegionCoordinates(_In_ GuiTerminalControl *lp
 
     return ToCppControl(lpControl)->ConvertFromRegionCoordinates(ToCppRegion(hRegion), iColRegion, iRowRegion, lpiColTerminal,
                                                                  lpiRowTerminal);
+}
+
+VOID GuiTerminalControl_ShowCursor(_In_ GuiTerminalControl *lpControl, _In_opt_ GuiTerminalRegion hRegion)
+{
+    if (lpControl)
+    {
+        ToCppControl(lpControl)->ShowCursor(ToCppRegion(hRegion));
+    }
+}
+
+VOID GuiTerminalControl_HideCursor(_In_ GuiTerminalControl *lpControl)
+{
+    if (lpControl)
+    {
+        ToCppControl(lpControl)->HideCursor();
+    }
+}
+
+VOID GuiTerminalControl_SetCursorStyle(_In_ GuiTerminalControl *lpControl, _In_ GuiTerminalCursorStyle cursorStyle)
+{
+    if (lpControl)
+    {
+        ToCppControl(lpControl)->SetCursorStyle(static_cast<GuiTerminal::Control::CursorStyle>(cursorStyle));
+    }
 }
 
 
