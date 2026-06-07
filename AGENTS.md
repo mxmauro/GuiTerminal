@@ -17,7 +17,8 @@
 - Avoid tabs in handwritten files. If a file is already generator-produced or consistently
   tab-aligned throughout, leave that style in place instead of normalizing it opportunistically.
 - Keep lines at or below 140 characters when practical. Split long statements and parameter lists for readability.
-- Use braces on their own lines for namespaces, classes, structs, functions, and control-flow blocks.
+- Use braces on their own lines for classes, structs, functions, and control-flow blocks.
+- Use compact namespace formatting in handwritten code: `namespace X {`, and do not add an extra indentation level solely for namespace scope.
 - Keep a blank line between logical sections, but avoid excessive vertical whitespace.
 - Use the existing separator comment style when it helps structure a file:
 
