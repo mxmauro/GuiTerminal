@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.21)
 
-project(GuiTerminal VERSION 0.7.1 LANGUAGES CXX)
+project(GuiTerminal VERSION 0.7.2 LANGUAGES CXX)
 
 include(CMakePackageConfigHelpers)
 include(GNUInstallDirs)

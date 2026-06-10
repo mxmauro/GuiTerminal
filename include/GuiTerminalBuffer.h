@@ -11,45 +11,48 @@ namespace GuiTerminal {
 
 namespace Internals {
 
-struct Cell
-{
+typedef struct Cell_s {
     WCHAR chCodepointW{};
     COLORREF crForeground{};
     COLORREF crBackground{};
     DWORD dwStyleFlags{};
     BOOL bIsDirty{};
-};
+} Cell_t;
 
-struct CursorState
-{
+typedef struct CursorState_s {
     INT iX{};
     INT iY{};
-};
+} CursorState_t;
 
-struct Attributes
-{
+typedef struct Attributes_s {
     COLORREF crForeground{};
     COLORREF crBackground{};
     DWORD dwStyleFlags{};
-};
+} Attributes_t;
 
-struct Region_s
-{
+typedef struct CellRect_s {
+    INT iX{};
+    INT iY{};
+    INT iWidth{};
+    INT iHeight{};
+} CellRect_t;
+
+typedef struct Region_s {
     INT iId{};
-    struct Region_s* hRegionParent{ nullptr };
+    struct Region_s* lpParent{ nullptr };
     INT iX{};
     INT iY{};
     INT iWidth{};
     INT iHeight{};
     INT iCursorX{};
     INT iCursorY{};
-    CursorState sCursorSaved;
+    CursorState_t sCursorSaved;
     BOOL bWrapPending{ FALSE };
     PVOID lpContext{ nullptr };
-    Attributes sAttributesCurrent{};
-    std::vector<Cell> vecCells;
+    Attributes_t sAttributesCurrent{};
+    std::vector<Cell_t> vecCells;
     std::vector<INT> vecChildRegionIds;
-};
+} Region_t;
 
 }
 
@@ -60,7 +63,7 @@ namespace Internals {
 class Buffer
 {
 public:
-    using Cell = Internals::Cell;
+    using Cell = Internals::Cell_t;
 
     struct Snapshot
     {
@@ -161,30 +164,29 @@ public:
 private:
     HRESULT InitializeRootRegion() noexcept;
     HRESULT ValidateRegionBounds(_In_ INT iWidth, _In_ INT iHeight) const noexcept;
-    Region_s* ResolveRegion(_In_opt_ RegionHandle hRegion) noexcept;
-    const Region_s* ResolveRegion(_In_opt_ RegionHandle hRegion) const noexcept;
-    HRESULT RemoveRegionFromParent(_Inout_ Region_s& sRegion) noexcept;
+    Region_t* ResolveRegion(_In_opt_ RegionHandle hRegion) noexcept;
+    const Region_t* ResolveRegion(_In_opt_ RegionHandle hRegion) const noexcept;
+    HRESULT RemoveRegionFromParent(_Inout_ Region_t& sRegion) noexcept;
     HRESULT DestroyRegionRecursive(_In_ RegionHandle hRegion) noexcept;
-    BOOL GetRegionTerminalOrigin(_In_ const Region_s& sRegion, _Out_ long long* lpllX, _Out_ long long* lpllY) const noexcept;
+    VOID GetRegionTerminalOrigin(_In_ const Region_t& sRegion, _Out_ LONGLONG& llX, _Out_ LONGLONG& llY) const noexcept;
+    VOID GetRegionVisibleTerminalRect(_In_ const Region_t& sRegion, _Out_ CellRect_t& sRectVisible) const noexcept;
 
     Cell MakeBlankCell() const noexcept;
-    HRESULT InitializeRegionCells(_Inout_ Region_s& sRegion) const noexcept;
-    HRESULT ResizeRegionCells(_In_ const Region_s& sRegionSource, _Out_ std::vector<Cell>& vecCellsTarget,
+    HRESULT InitializeRegionCells(_Inout_ Region_t& sRegion) const noexcept;
+    HRESULT ResizeRegionCells(_In_ const Region_t& sRegionSource, _Out_ std::vector<Cell>& vecCellsTarget,
                               _In_ INT iWidthTarget, _In_ INT iHeightTarget) const noexcept;
-    VOID ClearRegionCells(_Inout_ Region_s& sRegion) const noexcept;
-    VOID SetCell(_Inout_ Region_s& sRegion, _In_ INT iX, _In_ INT iY, _In_ WCHAR chCodepointW,
-                 _In_ const Attributes& sAttributesCell) noexcept;
-    VOID FillCell(_Inout_ Region_s& sRegion, _In_ INT iX, _In_ INT iY, _In_ const Attributes& sAttributesCell) noexcept;
-    VOID FillRange(_Inout_ Region_s& sRegion, _In_ INT iXStart, _In_ INT iYStart, _In_ INT iXEnd, _In_ INT iYEnd,
-                   _In_ const Attributes& sAttributesCell) noexcept;
+    VOID ClearRegionCells(_Inout_ Region_t& sRegion) const noexcept;
+    VOID SetCell(_Inout_ Region_t& sRegion, _In_ INT iX, _In_ INT iY, _In_ WCHAR chCodepointW,
+                 _In_ const Attributes_t& sAttributesCell) noexcept;
+    VOID FillCell(_Inout_ Region_t& sRegion, _In_ INT iX, _In_ INT iY, _In_ const Attributes_t& sAttributesCell) noexcept;
+    VOID FillRange(_Inout_ Region_t& sRegion, _In_ INT iXStart, _In_ INT iYStart, _In_ INT iXEnd, _In_ INT iYEnd,
+                   _In_ const Attributes_t& sAttributesCell) noexcept;
     BOOL IsCoordinateInsideRectangle(_In_ INT iX, _In_ INT iY, _In_ INT iStartX, _In_ INT iStartY, _In_ INT iEndX,
                                      _In_ INT iEndY) const noexcept;
-    const Cell* GetCell(_In_ const Region_s& sRegion, _In_ INT iX, _In_ INT iY) const noexcept;
-    VOID DrawStrokeCell(_Inout_ Region_s& sRegion, _In_ INT iX, _In_ INT iY, _In_ DWORD dwStrokeType, _In_ BYTE byUp,
-                        _In_ BYTE byRight, _In_ BYTE byDown, _In_ BYTE byLeft, _In_ const Attributes& sAttributesCell) noexcept;
-    BOOL ClipRectangle(_In_ const Region_s& sRegion, _In_ INT iX, _In_ INT iY, _In_ INT iWidth, _In_ INT iHeight,
-                       _Out_ LPINT lpiStartX, _Out_ LPINT lpiStartY, _Out_ LPINT lpiEndX,
-                       _Out_ LPINT lpiEndY) const noexcept;
+    const Cell* GetCell(_In_ const Region_t& sRegion, _In_ INT iX, _In_ INT iY) const noexcept;
+    VOID DrawStrokeCell(_Inout_ Region_t& sRegion, _In_ INT iX, _In_ INT iY, _In_ DWORD dwStrokeType, _In_ BYTE byUp,
+                        _In_ BYTE byRight, _In_ BYTE byDown, _In_ BYTE byLeft, _In_ const Attributes_t& sAttributesCell) noexcept;
+    BOOL ClipRectangle(_In_ const Region_t& sRegion, _In_ const CellRect_t& sRectSource, _Out_ CellRect_t& sRectClipped) const noexcept;
 
     VOID ScrollRegionUp(_In_opt_ RegionHandle hRegion, _In_ INT iLineCount) noexcept;
     VOID ScrollRegionDown(_In_opt_ RegionHandle hRegion, _In_ INT iLineCount) noexcept;
@@ -192,8 +194,8 @@ private:
     VOID AdvanceCursorAfterWrite(_In_opt_ RegionHandle hRegion) noexcept;
 
     BOOL GetCellIndex(_In_ INT iX, _In_ INT iY, _In_ INT iWidth, _Out_ PSIZE_T lpuIndex) const noexcept;
-    HRESULT ComposeRegion(_In_ const Region_s& sRegion) const noexcept;
-    HRESULT ComposeRegionTree(_In_ const Region_s& sRegionParent) const noexcept;
+    HRESULT ComposeRegion(_In_ const Region_t& sRegion) const noexcept;
+    HRESULT ComposeRegionTree(_In_ const Region_t& sRegionParent) const noexcept;
 
     VOID ApplySgrColor(_In_ RegionHandle hRegion, _In_reads_(uParamsCount) LPINT lpiParams, _In_ SIZE_T uParamsCount,
                        _Inout_ PSIZE_T lpuIndex, _In_ BOOL bForeground) noexcept;
@@ -203,8 +205,8 @@ private:
     INT m_iCols{};
     INT m_iRows{};
     mutable std::vector<Cell> m_vecSnapshotCells;
-    Attributes m_sAttributesDefault{};
-    std::unordered_map<INT, Region_s> m_mapRegions;
+    Attributes_t m_sAttributesDefault{};
+    std::unordered_map<INT, Region_t> m_mapRegions;
     RegionHandle m_hRegionCursorActive{};
     INT m_iNextRegionId{ 1 };
     BOOL m_bBlinkVisible{ TRUE };

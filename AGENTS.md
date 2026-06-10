@@ -18,6 +18,8 @@
   tab-aligned throughout, leave that style in place instead of normalizing it opportunistically.
 - Keep lines at or below 140 characters when practical. Split long statements and parameter lists for readability.
 - Use braces on their own lines for classes, structs, functions, and control-flow blocks.
+- Exception: keep the opening brace on the same line for `typedef struct` and `typedef enum` declarations, for example
+  `typedef struct Name_s {`.
 - Use compact namespace formatting in handwritten code: `namespace X {`, and do not add an extra indentation level solely for namespace scope.
 - Keep a blank line between logical sections, but avoid excessive vertical whitespace.
 - Use the existing separator comment style when it helps structure a file:

@@ -2,13 +2,12 @@
 #include "..\include\GuiTerminalControl.h"
 #include <algorithm>
 #include <array>
-#include <limits>
 
 // -----------------------------------------------------------------------------
 
 static COLORREF MakeColor(_In_ BYTE byRed, _In_ BYTE byGreen, _In_ BYTE byBlue) noexcept;
-static GuiTerminal::Internals::Attributes MakeAttributes(_In_ COLORREF crForeground, _In_ COLORREF crBackground,
-                                                         _In_ DWORD dwStyleFlags) noexcept;
+static GuiTerminal::Internals::Attributes_t MakeAttributes(_In_ COLORREF crForeground, _In_ COLORREF crBackground,
+                                                           _In_ DWORD dwStyleFlags) noexcept;
 struct BoxEdges
 {
     BYTE byUp{};
@@ -53,7 +52,7 @@ namespace GuiTerminal::Internals
 
     HRESULT Buffer::Resize(_In_ INT iCols, _In_ INT iRows) noexcept
     {
-        Region_s* lpsRegionRoot;
+        Region_t* lpsRegionRoot;
         std::vector<Cell> vecCellsRoot;
         std::vector<Cell> vecSnapshotCells;
         HRESULT hr;
@@ -103,7 +102,7 @@ namespace GuiTerminal::Internals
 
     VOID Buffer::ClearRegion(_In_opt_ RegionHandle hRegion) noexcept
     {
-        Region_s* lpsRegionCurrent;
+        Region_t* lpsRegionCurrent;
 
         lpsRegionCurrent = ResolveRegion(hRegion);
         if (!lpsRegionCurrent)
@@ -114,7 +113,7 @@ namespace GuiTerminal::Internals
         ClearRegionCells(*lpsRegionCurrent);
         lpsRegionCurrent->iCursorX = 0;
         lpsRegionCurrent->iCursorY = 0;
-        lpsRegionCurrent->sCursorSaved = CursorState{ 0, 0 };
+        lpsRegionCurrent->sCursorSaved = CursorState_t{ 0, 0 };
         lpsRegionCurrent->sAttributesCurrent = m_sAttributesDefault;
         lpsRegionCurrent->bWrapPending = FALSE;
     }
@@ -123,14 +122,12 @@ namespace GuiTerminal::Internals
                           _In_ WCHAR chCodepointW, _In_ COLORREF crForeground, _In_ COLORREF crBackground,
                           _In_ DWORD dwStyleFlags) noexcept
     {
-        Region_s* lpsRegionCurrent;
-        INT iStartX;
-        INT iStartY;
-        INT iEndX;
-        INT iEndY;
+        Region_t* lpsRegionCurrent;
+        CellRect_t sRectArea;
+        CellRect_t sRectClipped;
         INT iFillX;
         INT iFillY;
-        Attributes attributesCell;
+        Attributes_t attributesCell;
 
         if (iWidth <= 0 || iHeight <= 0)
         {
@@ -143,7 +140,11 @@ namespace GuiTerminal::Internals
             return;
         }
 
-        if (ClipRectangle(*lpsRegionCurrent, iX, iY, iWidth, iHeight, &iStartX, &iStartY, &iEndX, &iEndY) == FALSE)
+        sRectArea.iX = iX;
+        sRectArea.iY = iY;
+        sRectArea.iWidth = iWidth;
+        sRectArea.iHeight = iHeight;
+        if (ClipRectangle(*lpsRegionCurrent, sRectArea, sRectClipped) == FALSE)
         {
             return;
         }
@@ -152,9 +153,9 @@ namespace GuiTerminal::Internals
         attributesCell.crBackground = MakeColor(GetRValue(crBackground), GetGValue(crBackground), GetBValue(crBackground));
         attributesCell.dwStyleFlags = dwStyleFlags;
 
-        for (iFillY = iStartY; iFillY <= iEndY; ++iFillY)
+        for (iFillY = sRectClipped.iY; iFillY < sRectClipped.iY + sRectClipped.iHeight; ++iFillY)
         {
-            for (iFillX = iStartX; iFillX <= iEndX; ++iFillX)
+            for (iFillX = sRectClipped.iX; iFillX < sRectClipped.iX + sRectClipped.iWidth; ++iFillX)
             {
                 SetCell(*lpsRegionCurrent, iFillX, iFillY, chCodepointW, attributesCell);
             }
@@ -165,12 +166,10 @@ namespace GuiTerminal::Internals
                           _In_ INT iTargetX, _In_ INT iTargetY, _In_ WCHAR chFillW, _In_ COLORREF crForeground,
                           _In_ COLORREF crBackground, _In_ DWORD dwStyleFlags) noexcept
     {
-        Region_s* lpsRegionCurrent;
-        Attributes sFillAttributes;
-        INT iSourceStartX;
-        INT iSourceStartY;
-        INT iSourceEndX;
-        INT iSourceEndY;
+        Region_t* lpsRegionCurrent;
+        Attributes_t sFillAttributes;
+        CellRect_t sRectSource;
+        CellRect_t sRectSourceClipped;
         INT iDestinationStartX;
         INT iDestinationStartY;
         INT iDestinationEndX;
@@ -200,25 +199,28 @@ namespace GuiTerminal::Internals
         {
             return;
         }
-        if (ClipRectangle(*lpsRegionCurrent, iSourceX, iSourceY, iWidth, iHeight, &iSourceStartX, &iSourceStartY, &iSourceEndX,
-                          &iSourceEndY) == FALSE)
+        sRectSource.iX = iSourceX;
+        sRectSource.iY = iSourceY;
+        sRectSource.iWidth = iWidth;
+        sRectSource.iHeight = iHeight;
+        if (ClipRectangle(*lpsRegionCurrent, sRectSource, sRectSourceClipped) == FALSE)
         {
             return;
         }
 
         iDeltaX = iTargetX - iSourceX;
         iDeltaY = iTargetY - iSourceY;
-        iDestinationStartX = iSourceStartX + iDeltaX;
-        iDestinationStartY = iSourceStartY + iDeltaY;
-        iDestinationEndX = iSourceEndX + iDeltaX;
-        iDestinationEndY = iSourceEndY + iDeltaY;
+        iDestinationStartX = sRectSourceClipped.iX + iDeltaX;
+        iDestinationStartY = sRectSourceClipped.iY + iDeltaY;
+        iDestinationEndX = iDestinationStartX + sRectSourceClipped.iWidth - 1;
+        iDestinationEndY = iDestinationStartY + sRectSourceClipped.iHeight - 1;
 
         iStepX = (iDeltaX > 0) ? -1 : 1;
         iStepY = (iDeltaY > 0) ? -1 : 1;
-        iStartX = (iStepX > 0) ? iSourceStartX : iSourceEndX;
-        iStartY = (iStepY > 0) ? iSourceStartY : iSourceEndY;
-        iEndXExclusive = (iStepX > 0) ? (iSourceEndX + 1) : (iSourceStartX - 1);
-        iEndYExclusive = (iStepY > 0) ? (iSourceEndY + 1) : (iSourceStartY - 1);
+        iStartX = (iStepX > 0) ? sRectSourceClipped.iX : (sRectSourceClipped.iX + sRectSourceClipped.iWidth - 1);
+        iStartY = (iStepY > 0) ? sRectSourceClipped.iY : (sRectSourceClipped.iY + sRectSourceClipped.iHeight - 1);
+        iEndXExclusive = (iStepX > 0) ? (sRectSourceClipped.iX + sRectSourceClipped.iWidth) : (sRectSourceClipped.iX - 1);
+        iEndYExclusive = (iStepY > 0) ? (sRectSourceClipped.iY + sRectSourceClipped.iHeight) : (sRectSourceClipped.iY - 1);
 
         for (iSourceCurrentY = iStartY; iSourceCurrentY != iEndYExclusive; iSourceCurrentY += iStepY)
         {
@@ -243,9 +245,9 @@ namespace GuiTerminal::Internals
         sFillAttributes = MakeAttributes(MakeColor(GetRValue(crForeground), GetGValue(crForeground), GetBValue(crForeground)),
                                          MakeColor(GetRValue(crBackground), GetGValue(crBackground), GetBValue(crBackground)),
                                          dwStyleFlags);
-        for (iSourceCurrentY = iSourceStartY; iSourceCurrentY <= iSourceEndY; ++iSourceCurrentY)
+        for (iSourceCurrentY = sRectSourceClipped.iY; iSourceCurrentY < sRectSourceClipped.iY + sRectSourceClipped.iHeight; ++iSourceCurrentY)
         {
-            for (iSourceCurrentX = iSourceStartX; iSourceCurrentX <= iSourceEndX; ++iSourceCurrentX)
+            for (iSourceCurrentX = sRectSourceClipped.iX; iSourceCurrentX < sRectSourceClipped.iX + sRectSourceClipped.iWidth; ++iSourceCurrentX)
             {
                 if (IsCoordinateInsideRectangle(iSourceCurrentX, iSourceCurrentY, iDestinationStartX, iDestinationStartY, iDestinationEndX,
                                                 iDestinationEndY) != FALSE)
@@ -260,8 +262,8 @@ namespace GuiTerminal::Internals
     VOID Buffer::DrawHorizontalLine(_In_opt_ RegionHandle hRegion, _In_ INT iX, _In_ INT iY, _In_ INT iWidth, _In_ DWORD dwStrokeType,
                                     _In_ COLORREF crForeground, _In_ COLORREF crBackground, _In_ DWORD dwStyleFlags) noexcept
     {
-        Region_s* lpsRegionCurrent;
-        Attributes sAttributesCell;
+        Region_t* lpsRegionCurrent;
+        Attributes_t sAttributesCell;
         BYTE byWeight;
         INT iStartX;
         INT iEndX;
@@ -307,8 +309,8 @@ namespace GuiTerminal::Internals
     VOID Buffer::DrawVerticalLine(_In_opt_ RegionHandle hRegion, _In_ INT iX, _In_ INT iY, _In_ INT iHeight, _In_ DWORD dwStrokeType,
                                   _In_ COLORREF crForeground, _In_ COLORREF crBackground, _In_ DWORD dwStyleFlags) noexcept
     {
-        Region_s* lpsRegionCurrent;
-        Attributes sAttributesCell;
+        Region_t* lpsRegionCurrent;
+        Attributes_t sAttributesCell;
         BYTE byWeight;
         INT iStartY;
         INT iEndY;
@@ -355,8 +357,8 @@ namespace GuiTerminal::Internals
                          _In_ DWORD dwBoxSideFlags, _In_ COLORREF crForeground, _In_ COLORREF crBackground,
                          _In_ DWORD dwStyleFlags) noexcept
     {
-        Region_s* lpsRegionCurrent;
-        Attributes sAttributesCell;
+        Region_t* lpsRegionCurrent;
+        Attributes_t sAttributesCell;
         BYTE byTop;
         BYTE byRight;
         BYTE byBottom;
@@ -456,7 +458,7 @@ namespace GuiTerminal::Internals
 
     VOID Buffer::ResetAttributes(_In_opt_ RegionHandle hRegion) noexcept
     {
-        Region_s* lpsRegionCurrent;
+        Region_t* lpsRegionCurrent;
 
         lpsRegionCurrent = ResolveRegion(hRegion);
         if (!lpsRegionCurrent)
@@ -468,7 +470,7 @@ namespace GuiTerminal::Internals
 
     VOID Buffer::PutCodepoint(_In_opt_ RegionHandle hRegion, _In_ WCHAR chCodepointW) noexcept
     {
-        Region_s* lpsRegionCurrent;
+        Region_t* lpsRegionCurrent;
 
         lpsRegionCurrent = ResolveRegion(hRegion);
         if (!lpsRegionCurrent)
@@ -495,7 +497,7 @@ namespace GuiTerminal::Internals
 
     VOID Buffer::ProcessControl(_In_opt_ RegionHandle hRegion, _In_ WCHAR chCodepointW) noexcept
     {
-        Region_s* lpsRegionCurrent;
+        Region_t* lpsRegionCurrent;
 
         lpsRegionCurrent = ResolveRegion(hRegion);
         if (!lpsRegionCurrent)
@@ -537,7 +539,7 @@ namespace GuiTerminal::Internals
 
     VOID Buffer::MoveCursorRelative(_In_opt_ RegionHandle hRegion, _In_ INT iDeltaX, _In_ INT iDeltaY) noexcept
     {
-        Region_s* lpsRegionCurrent;
+        Region_t* lpsRegionCurrent;
 
         lpsRegionCurrent = ResolveRegion(hRegion);
         if (!lpsRegionCurrent)
@@ -552,7 +554,7 @@ namespace GuiTerminal::Internals
 
     VOID Buffer::SetCursorPosition(_In_opt_ RegionHandle hRegion, _In_ INT iRowOneBased, _In_ INT iColOneBased) noexcept
     {
-        Region_s* lpsRegionCurrent;
+        Region_t* lpsRegionCurrent;
 
         lpsRegionCurrent = ResolveRegion(hRegion);
         if (!lpsRegionCurrent)
@@ -567,7 +569,7 @@ namespace GuiTerminal::Internals
 
     VOID Buffer::SetCursorColumn(_In_opt_ RegionHandle hRegion, _In_ INT iColOneBased) noexcept
     {
-        Region_s* lpsRegionCurrent;
+        Region_t* lpsRegionCurrent;
 
         lpsRegionCurrent = ResolveRegion(hRegion);
         if (!lpsRegionCurrent)
@@ -580,7 +582,7 @@ namespace GuiTerminal::Internals
 
     VOID Buffer::SetCursorRow(_In_opt_ RegionHandle hRegion, _In_ INT iRowOneBased) noexcept
     {
-        Region_s* lpsRegionCurrent;
+        Region_t* lpsRegionCurrent;
 
         lpsRegionCurrent = ResolveRegion(hRegion);
         if (!lpsRegionCurrent)
@@ -593,7 +595,7 @@ namespace GuiTerminal::Internals
 
     VOID Buffer::EraseInLine(_In_opt_ RegionHandle hRegion, _In_ INT iMode) noexcept
     {
-        Region_s* lpsRegionCurrent;
+        Region_t* lpsRegionCurrent;
         INT iStartX;
         INT iEndX;
         INT iX;
@@ -623,7 +625,7 @@ namespace GuiTerminal::Internals
 
     VOID Buffer::EraseInDisplay(_In_opt_ RegionHandle hRegion, _In_ INT iMode) noexcept
     {
-        Region_s* lpsRegionCurrent;
+        Region_t* lpsRegionCurrent;
         INT iYStart;
         INT iYEnd;
         INT iY;
@@ -676,7 +678,7 @@ namespace GuiTerminal::Internals
     VOID Buffer::SetGraphicsRendition(_In_opt_ RegionHandle hRegion, _In_reads_(uParamsCount) LPINT lpiParams,
                                       _In_ SIZE_T uParamsCount) noexcept
     {
-        Region_s* lpsRegionCurrent;
+        Region_t* lpsRegionCurrent;
         SIZE_T uIndex;
         INT iValue;
 
@@ -773,9 +775,9 @@ namespace GuiTerminal::Internals
     HRESULT Buffer::CreateRegion(_In_ INT iX, _In_ INT iY, _In_ INT iWidth, _In_ INT iHeight, _Out_ RegionHandle* lphRegion,
                                  _In_opt_ RegionHandle hRegionParent) noexcept
     {
-        Region_s sRegionCurrent;
-        Region_s* lpsRegionParent;
-        Region_s* lpsRegionCreated;
+        Region_t sRegionCurrent;
+        Region_t* lpsRegionParent;
+        Region_t* lpsRegionCreated;
         HRESULT hr;
 
         if (!lphRegion)
@@ -796,9 +798,9 @@ namespace GuiTerminal::Internals
             return hRegionParent ? HRESULT_FROM_WIN32(ERROR_NOT_FOUND) : E_UNEXPECTED;
         }
 
-        sRegionCurrent = Region_s{};
+        sRegionCurrent = Region_t{};
         sRegionCurrent.iId = m_iNextRegionId;
-        sRegionCurrent.hRegionParent = lpsRegionParent;
+        sRegionCurrent.lpParent = lpsRegionParent;
         sRegionCurrent.iX = iX;
         sRegionCurrent.iY = iY;
         sRegionCurrent.iWidth = iWidth;
@@ -846,7 +848,7 @@ namespace GuiTerminal::Internals
 
     HRESULT Buffer::RelocateRegion(_In_ RegionHandle hRegion, _In_ INT iX, _In_ INT iY, _In_ INT iWidth, _In_ INT iHeight) noexcept
     {
-        Region_s* lpsRegionCurrent;
+        Region_t* lpsRegionCurrent;
         std::vector<Cell> vecCellsResized;
         HRESULT hr;
 
@@ -882,8 +884,8 @@ namespace GuiTerminal::Internals
 
     HRESULT Buffer::BringRegionToFront(_In_ RegionHandle hRegion) noexcept
     {
-        Region_s* lpsRegionCurrent;
-        Region_s* lpsRegionParent;
+        Region_t* lpsRegionCurrent;
+        Region_t* lpsRegionParent;
         auto itOrder = std::vector<INT>::iterator{};
 
         if ((!hRegion) || hRegion->iId == 0)
@@ -895,7 +897,7 @@ namespace GuiTerminal::Internals
         {
             return HRESULT_FROM_WIN32(ERROR_NOT_FOUND);
         }
-        lpsRegionParent = ResolveRegion(lpsRegionCurrent->hRegionParent);
+        lpsRegionParent = ResolveRegion(lpsRegionCurrent->lpParent);
         if (!lpsRegionParent)
         {
             return E_UNEXPECTED;
@@ -918,8 +920,8 @@ namespace GuiTerminal::Internals
 
     HRESULT Buffer::SendRegionToBack(_In_ RegionHandle hRegion) noexcept
     {
-        Region_s* lpsRegionCurrent;
-        Region_s* lpsRegionParent;
+        Region_t* lpsRegionCurrent;
+        Region_t* lpsRegionParent;
         auto itOrder = std::vector<INT>::iterator{};
 
         if ((!hRegion) || hRegion->iId == 0)
@@ -931,7 +933,7 @@ namespace GuiTerminal::Internals
         {
             return HRESULT_FROM_WIN32(ERROR_NOT_FOUND);
         }
-        lpsRegionParent = ResolveRegion(lpsRegionCurrent->hRegionParent);
+        lpsRegionParent = ResolveRegion(lpsRegionCurrent->lpParent);
         if (!lpsRegionParent)
         {
             return E_UNEXPECTED;
@@ -954,9 +956,9 @@ namespace GuiTerminal::Internals
 
     HRESULT Buffer::MoveRegionAfter(_In_ RegionHandle hRegion, _In_opt_ RegionHandle hRegionReference) noexcept
     {
-        Region_s* lpsRegionCurrent;
-        Region_s* lpsRegionParent;
-        Region_s* lpsRegionReference;
+        Region_t* lpsRegionCurrent;
+        Region_t* lpsRegionParent;
+        Region_t* lpsRegionReference;
         auto itOrder = std::vector<INT>::iterator{};
         auto itReference = std::vector<INT>::iterator{};
         INT iRegionId;
@@ -970,7 +972,7 @@ namespace GuiTerminal::Internals
         {
             return HRESULT_FROM_WIN32(ERROR_NOT_FOUND);
         }
-        lpsRegionParent = ResolveRegion(lpsRegionCurrent->hRegionParent);
+        lpsRegionParent = ResolveRegion(lpsRegionCurrent->lpParent);
         if (!lpsRegionParent)
         {
             return E_UNEXPECTED;
@@ -988,7 +990,7 @@ namespace GuiTerminal::Internals
             {
                 return HRESULT_FROM_WIN32(ERROR_NOT_FOUND);
             }
-            if (lpsRegionReference->hRegionParent != lpsRegionCurrent->hRegionParent)
+            if (lpsRegionReference->lpParent != lpsRegionCurrent->lpParent)
             {
                 return E_INVALIDARG;
             }
@@ -1025,7 +1027,7 @@ namespace GuiTerminal::Internals
 
     HRESULT Buffer::SetRegionContext(_In_opt_ RegionHandle hRegion, _In_opt_ PVOID lpContext) noexcept
     {
-        Region_s* lpsRegionCurrent;
+        Region_t* lpsRegionCurrent;
 
         lpsRegionCurrent = ResolveRegion(hRegion);
         if (!lpsRegionCurrent)
@@ -1039,7 +1041,7 @@ namespace GuiTerminal::Internals
 
     PVOID Buffer::GetRegionContext(_In_opt_ RegionHandle hRegion) const noexcept
     {
-        const Region_s* lpsRegionCurrent;
+        const Region_t* lpsRegionCurrent;
 
         lpsRegionCurrent = ResolveRegion(hRegion);
         if (!lpsRegionCurrent)
@@ -1062,8 +1064,8 @@ namespace GuiTerminal::Internals
 
     RegionHandle Buffer::GetNextRegion(_In_opt_ RegionHandle hRegion) const noexcept
     {
-        const Region_s* lpsRegionCurrent;
-        const Region_s* lpsRegionParent;
+        const Region_t* lpsRegionCurrent;
+        const Region_t* lpsRegionParent;
         auto itOrder = std::vector<INT>::const_iterator{};
         auto itRegion = m_mapRegions.end();
 
@@ -1076,7 +1078,7 @@ namespace GuiTerminal::Internals
         {
             return nullptr;
         }
-        lpsRegionParent = ResolveRegion(lpsRegionCurrent->hRegionParent);
+        lpsRegionParent = ResolveRegion(lpsRegionCurrent->lpParent);
         if (!lpsRegionParent)
         {
             return nullptr;
@@ -1094,7 +1096,7 @@ namespace GuiTerminal::Internals
             itRegion = m_mapRegions.find(*itOrder);
             if (itRegion != m_mapRegions.end())
             {
-                return const_cast<Region_s*>(&itRegion->second);
+                return const_cast<Region_t*>(&itRegion->second);
             }
         }
 
@@ -1103,8 +1105,8 @@ namespace GuiTerminal::Internals
 
     RegionHandle Buffer::GetPreviousRegion(_In_opt_ RegionHandle hRegion) const noexcept
     {
-        const Region_s* lpsRegionCurrent;
-        const Region_s* lpsRegionParent;
+        const Region_t* lpsRegionCurrent;
+        const Region_t* lpsRegionParent;
         auto itOrder = std::vector<INT>::const_iterator{};
         auto itRegion = m_mapRegions.end();
 
@@ -1117,7 +1119,7 @@ namespace GuiTerminal::Internals
         {
             return nullptr;
         }
-        lpsRegionParent = ResolveRegion(lpsRegionCurrent->hRegionParent);
+        lpsRegionParent = ResolveRegion(lpsRegionCurrent->lpParent);
         if (!lpsRegionParent)
         {
             return nullptr;
@@ -1134,7 +1136,7 @@ namespace GuiTerminal::Internals
             itRegion = m_mapRegions.find(*itOrder);
             if (itRegion != m_mapRegions.end())
             {
-                return const_cast<Region_s*>(&itRegion->second);
+                return const_cast<Region_t*>(&itRegion->second);
             }
         }
 
@@ -1143,7 +1145,7 @@ namespace GuiTerminal::Internals
 
     RegionHandle Buffer::GetChildFirstRegion(_In_opt_ RegionHandle hRegionParent) const noexcept
     {
-        const Region_s* lpsRegionParent;
+        const Region_t* lpsRegionParent;
         auto itOrder = std::vector<INT>::const_reverse_iterator{};
         auto itRegion = m_mapRegions.end();
 
@@ -1158,7 +1160,7 @@ namespace GuiTerminal::Internals
             itRegion = m_mapRegions.find(*itOrder);
             if (itRegion != m_mapRegions.end())
             {
-                return const_cast<Region_s*>(&itRegion->second);
+                return const_cast<Region_t*>(&itRegion->second);
             }
         }
 
@@ -1167,7 +1169,7 @@ namespace GuiTerminal::Internals
 
     RegionHandle Buffer::GetChildLastRegion(_In_opt_ RegionHandle hRegionParent) const noexcept
     {
-        const Region_s* lpsRegionParent;
+        const Region_t* lpsRegionParent;
         auto itOrder = std::vector<INT>::const_iterator{};
         auto itRegion = m_mapRegions.end();
 
@@ -1182,7 +1184,7 @@ namespace GuiTerminal::Internals
             itRegion = m_mapRegions.find(*itOrder);
             if (itRegion != m_mapRegions.end())
             {
-                return const_cast<Region_s*>(&itRegion->second);
+                return const_cast<Region_t*>(&itRegion->second);
             }
         }
 
@@ -1191,8 +1193,8 @@ namespace GuiTerminal::Internals
 
     RegionHandle Buffer::GetParentRegion(_In_ RegionHandle hRegion) const noexcept
     {
-        const Region_s* lpsRegionCurrent;
-        const Region_s* lpsRegionParent;
+        const Region_t* lpsRegionCurrent;
+        const Region_t* lpsRegionParent;
 
         lpsRegionCurrent = ResolveRegion(hRegion);
         if ((!lpsRegionCurrent) || lpsRegionCurrent->iId == 0)
@@ -1200,18 +1202,18 @@ namespace GuiTerminal::Internals
             return nullptr;
         }
 
-        lpsRegionParent = ResolveRegion(lpsRegionCurrent->hRegionParent);
+        lpsRegionParent = ResolveRegion(lpsRegionCurrent->lpParent);
         if ((!lpsRegionParent) || lpsRegionParent->iId == 0)
         {
             return nullptr;
         }
-        return const_cast<Region_s*>(lpsRegionParent);
+        return const_cast<Region_t*>(lpsRegionParent);
     }
 
     VOID Buffer::GetRegionLocation(_In_ RegionHandle hRegion, _Out_opt_ LPINT lpiX, _Out_opt_ LPINT lpiY, _Out_opt_ LPINT lpiWidth,
                                    _Out_opt_ LPINT lpiHeight) const noexcept
     {
-        const Region_s* lpsRegionCurrent;
+        const Region_t* lpsRegionCurrent;
 
         lpsRegionCurrent = ResolveRegion(hRegion);
         if (!lpsRegionCurrent)
@@ -1240,9 +1242,9 @@ namespace GuiTerminal::Internals
     BOOL Buffer::ConvertToRegionCoordinates(_In_ RegionHandle hRegion, _In_ INT iColTerminal, _In_ INT iRowTerminal,
                                             _Out_opt_ LPINT lpiColRegion, _Out_opt_ LPINT lpiRowRegion) const noexcept
     {
-        const Region_s* lpsRegionCurrent;
-        long long llColRegion;
-        long long llRowRegion;
+        const Region_t* lpsRegionCurrent;
+        LONGLONG llColRegion;
+        LONGLONG llRowRegion;
 
         if (lpiColRegion)
         {
@@ -1263,17 +1265,12 @@ namespace GuiTerminal::Internals
             return FALSE;
         }
 
-        if (GetRegionTerminalOrigin(*lpsRegionCurrent, &llColRegion, &llRowRegion) == FALSE)
-        {
-            return FALSE;
-        }
+        GetRegionTerminalOrigin(*lpsRegionCurrent, llColRegion, llRowRegion);
 
-        llColRegion = static_cast<long long>(iColTerminal) - llColRegion;
-        llRowRegion = static_cast<long long>(iRowTerminal) - llRowRegion;
-        if ((llColRegion < static_cast<long long>((std::numeric_limits<INT>::min)())) ||
-            (llColRegion > static_cast<long long>((std::numeric_limits<INT>::max)())) ||
-            (llRowRegion < static_cast<long long>((std::numeric_limits<INT>::min)())) ||
-            (llRowRegion > static_cast<long long>((std::numeric_limits<INT>::max)())))
+        llColRegion = static_cast<LONGLONG>(iColTerminal) - llColRegion;
+        llRowRegion = static_cast<LONGLONG>(iRowTerminal) - llRowRegion;
+        if ((llColRegion < static_cast<LONGLONG>(INT_MIN)) || (llColRegion > static_cast<LONGLONG>(INT_MAX)) ||
+            (llRowRegion < static_cast<LONGLONG>(INT_MIN)) || (llRowRegion > static_cast<LONGLONG>(INT_MAX)))
         {
             return FALSE;
         }
@@ -1292,11 +1289,11 @@ namespace GuiTerminal::Internals
     BOOL Buffer::ConvertFromRegionCoordinates(_In_ RegionHandle hRegion, _In_ INT iColRegion, _In_ INT iRowRegion,
                                               _Out_opt_ LPINT lpiColTerminal, _Out_opt_ LPINT lpiRowTerminal) const noexcept
     {
-        const Region_s* lpsRegionCurrent;
-        long long llColTerminal;
-        long long llRowTerminal;
-        long long llOriginX;
-        long long llOriginY;
+        const Region_t* lpsRegionCurrent;
+        LONGLONG llColTerminal;
+        LONGLONG llRowTerminal;
+        LONGLONG llOriginX;
+        LONGLONG llOriginY;
 
         if (lpiColTerminal)
         {
@@ -1321,17 +1318,12 @@ namespace GuiTerminal::Internals
             return FALSE;
         }
 
-        if (GetRegionTerminalOrigin(*lpsRegionCurrent, &llOriginX, &llOriginY) == FALSE)
-        {
-            return FALSE;
-        }
+        GetRegionTerminalOrigin(*lpsRegionCurrent, llOriginX, llOriginY);
 
-        llColTerminal = llOriginX + static_cast<long long>(iColRegion);
-        llRowTerminal = llOriginY + static_cast<long long>(iRowRegion);
-        if ((llColTerminal < static_cast<long long>((std::numeric_limits<INT>::min)())) ||
-            (llColTerminal > static_cast<long long>((std::numeric_limits<INT>::max)())) ||
-            (llRowTerminal < static_cast<long long>((std::numeric_limits<INT>::min)())) ||
-            (llRowTerminal > static_cast<long long>((std::numeric_limits<INT>::max)())))
+        llColTerminal = llOriginX + static_cast<LONGLONG>(iColRegion);
+        llRowTerminal = llOriginY + static_cast<LONGLONG>(iRowRegion);
+        if ((llColTerminal < static_cast<LONGLONG>(INT_MIN)) || (llColTerminal > static_cast<LONGLONG>(INT_MAX)) ||
+            (llRowTerminal < static_cast<LONGLONG>(INT_MIN)) || (llRowTerminal > static_cast<LONGLONG>(INT_MAX)))
         {
             return FALSE;
         }
@@ -1349,7 +1341,7 @@ namespace GuiTerminal::Internals
 
     VOID Buffer::SaveCursor(_In_opt_ RegionHandle hRegion) noexcept
     {
-        Region_s* lpsRegionCurrent;
+        Region_t* lpsRegionCurrent;
 
         lpsRegionCurrent = ResolveRegion(hRegion);
         if (!lpsRegionCurrent)
@@ -1363,7 +1355,7 @@ namespace GuiTerminal::Internals
 
     VOID Buffer::RestoreCursor(_In_opt_ RegionHandle hRegion) noexcept
     {
-        Region_s* lpsRegionCurrent;
+        Region_t* lpsRegionCurrent;
 
         lpsRegionCurrent = ResolveRegion(hRegion);
         if (!lpsRegionCurrent)
@@ -1417,10 +1409,10 @@ namespace GuiTerminal::Internals
 
     HRESULT Buffer::GetSnapshot(_Out_ Snapshot* lpSnapshot) const noexcept
     {
-        const Region_s* lpsRegionRoot;
-        const Region_s* lpsRegionCursor;
-        long long llCursorCol;
-        long long llCursorRow;
+        const Region_t* lpsRegionRoot;
+        const Region_t* lpsRegionCursor;
+        LONGLONG llCursorCol;
+        LONGLONG llCursorRow;
         HRESULT hr;
 
         if (!lpSnapshot)
@@ -1468,14 +1460,21 @@ namespace GuiTerminal::Internals
         lpSnapshot->crDefaultBackground = m_sAttributesDefault.crBackground;
 
         lpsRegionCursor = ResolveRegion(m_hRegionCursorActive);
-        if (m_bCursorVisible != FALSE && lpsRegionCursor && GetRegionTerminalOrigin(*lpsRegionCursor, &llCursorCol, &llCursorRow) != FALSE)
+        if (m_bCursorVisible != FALSE && lpsRegionCursor)
         {
-            llCursorCol += static_cast<long long>(lpsRegionCursor->iCursorX);
-            llCursorRow += static_cast<long long>(lpsRegionCursor->iCursorY);
-            if ((llCursorCol >= static_cast<long long>((std::numeric_limits<INT>::min)())) &&
-                (llCursorCol <= static_cast<long long>((std::numeric_limits<INT>::max)())) &&
-                (llCursorRow >= static_cast<long long>((std::numeric_limits<INT>::min)())) &&
-                (llCursorRow <= static_cast<long long>((std::numeric_limits<INT>::max)())))
+            CellRect_t sRectVisible;
+
+            GetRegionTerminalOrigin(*lpsRegionCursor, llCursorCol, llCursorRow);
+            llCursorCol += static_cast<LONGLONG>(lpsRegionCursor->iCursorX);
+            llCursorRow += static_cast<LONGLONG>(lpsRegionCursor->iCursorY);
+
+            GetRegionVisibleTerminalRect(*lpsRegionCursor, sRectVisible);
+            if ((llCursorCol >= static_cast<LONGLONG>(sRectVisible.iX)) &&
+                (llCursorCol < static_cast<LONGLONG>(sRectVisible.iX + sRectVisible.iWidth)) &&
+                (llCursorRow >= static_cast<LONGLONG>(sRectVisible.iY)) &&
+                (llCursorRow < static_cast<LONGLONG>(sRectVisible.iY + sRectVisible.iHeight)) &&
+                (llCursorCol >= static_cast<LONGLONG>(INT_MIN)) && (llCursorCol <= static_cast<LONGLONG>(INT_MAX)) &&
+                (llCursorRow >= static_cast<LONGLONG>(INT_MIN)) && (llCursorRow <= static_cast<LONGLONG>(INT_MAX)))
             {
                 lpSnapshot->bCursorVisible = TRUE;
                 lpSnapshot->iCursorCol = static_cast<INT>(llCursorCol);
@@ -1489,10 +1488,10 @@ namespace GuiTerminal::Internals
 
     HRESULT Buffer::InitializeRootRegion() noexcept
     {
-        Region_s sRegionRoot;
+        Region_t sRegionRoot;
         HRESULT hr;
 
-        sRegionRoot = Region_s{};
+        sRegionRoot = Region_t{};
         sRegionRoot.iId = 0;
         sRegionRoot.iWidth = m_iCols;
         sRegionRoot.iHeight = m_iRows;
@@ -1532,7 +1531,7 @@ namespace GuiTerminal::Internals
         return S_OK;
     }
 
-    Region_s* Buffer::ResolveRegion(_In_opt_ RegionHandle hRegion) noexcept
+    Region_t* Buffer::ResolveRegion(_In_opt_ RegionHandle hRegion) noexcept
     {
         auto itRegion = m_mapRegions.end();
 
@@ -1550,7 +1549,7 @@ namespace GuiTerminal::Internals
         return &itRegion->second;
     }
 
-    const Region_s* Buffer::ResolveRegion(_In_opt_ RegionHandle hRegion) const noexcept
+    const Region_t* Buffer::ResolveRegion(_In_opt_ RegionHandle hRegion) const noexcept
     {
         auto itRegion = m_mapRegions.end();
 
@@ -1568,12 +1567,12 @@ namespace GuiTerminal::Internals
         return &itRegion->second;
     }
 
-    HRESULT Buffer::RemoveRegionFromParent(_Inout_ Region_s& sRegion) noexcept
+    HRESULT Buffer::RemoveRegionFromParent(_Inout_ Region_t& sRegion) noexcept
     {
-        Region_s* lpsRegionParent;
+        Region_t* lpsRegionParent;
         auto itOrder = std::vector<INT>::iterator{};
 
-        lpsRegionParent = ResolveRegion(sRegion.hRegionParent);
+        lpsRegionParent = ResolveRegion(sRegion.lpParent);
         if (!lpsRegionParent)
         {
             return E_UNEXPECTED;
@@ -1586,13 +1585,13 @@ namespace GuiTerminal::Internals
         }
 
         lpsRegionParent->vecChildRegionIds.erase(itOrder);
-        sRegion.hRegionParent = nullptr;
+        sRegion.lpParent = nullptr;
         return S_OK;
     }
 
     HRESULT Buffer::DestroyRegionRecursive(_In_ RegionHandle hRegion) noexcept
     {
-        Region_s* lpsRegionCurrent;
+        Region_t* lpsRegionCurrent;
         HRESULT hr;
 
         lpsRegionCurrent = ResolveRegion(hRegion);
@@ -1631,30 +1630,63 @@ namespace GuiTerminal::Internals
         return S_OK;
     }
 
-    BOOL Buffer::GetRegionTerminalOrigin(_In_ const Region_s& sRegion, _Out_ long long* lpllX, _Out_ long long* lpllY) const noexcept
+    VOID Buffer::GetRegionTerminalOrigin(_In_ const Region_t& sRegion, _Out_ LONGLONG& llX, _Out_ LONGLONG& llY) const noexcept
     {
-        const Region_s* lpsRegionCurrent;
-        long long llX;
-        long long llY;
-
-        if ((!lpllX) || (!lpllY))
-        {
-            return FALSE;
-        }
+        const Region_t* lpsRegionCurrent;
 
         llX = 0;
         llY = 0;
         lpsRegionCurrent = &sRegion;
         while (lpsRegionCurrent && lpsRegionCurrent->iId != 0)
         {
-            llX += static_cast<long long>(lpsRegionCurrent->iX);
-            llY += static_cast<long long>(lpsRegionCurrent->iY);
-            lpsRegionCurrent = lpsRegionCurrent->hRegionParent;
+            llX += static_cast<LONGLONG>(lpsRegionCurrent->iX);
+            llY += static_cast<LONGLONG>(lpsRegionCurrent->iY);
+            lpsRegionCurrent = lpsRegionCurrent->lpParent;
+        }
+    }
+
+    VOID Buffer::GetRegionVisibleTerminalRect(_In_ const Region_t& sRegion, _Out_ CellRect_t& sRectVisible) const noexcept
+    {
+        const Region_t* lpsRegionCurrent;
+        LONGLONG llRegionLeft;
+        LONGLONG llRegionTop;
+        LONGLONG llRegionRight;
+        LONGLONG llRegionBottom;
+        LONGLONG llParentLeft;
+        LONGLONG llParentTop;
+
+        GetRegionTerminalOrigin(sRegion, llRegionLeft, llRegionTop);
+
+        llRegionRight = llRegionLeft + static_cast<LONGLONG>(sRegion.iWidth);
+        llRegionBottom = llRegionTop + static_cast<LONGLONG>(sRegion.iHeight);
+
+        lpsRegionCurrent = sRegion.lpParent;
+        while (lpsRegionCurrent)
+        {
+            GetRegionTerminalOrigin(*lpsRegionCurrent, llParentLeft, llParentTop);
+
+            llRegionLeft = (std::max)(llRegionLeft, llParentLeft);
+            llRegionTop = (std::max)(llRegionTop, llParentTop);
+            llRegionRight = (std::min)(llRegionRight, llParentLeft + static_cast<LONGLONG>(lpsRegionCurrent->iWidth));
+            llRegionBottom = (std::min)(llRegionBottom, llParentTop + static_cast<LONGLONG>(lpsRegionCurrent->iHeight));
+
+            lpsRegionCurrent = lpsRegionCurrent->lpParent;
         }
 
-        *lpllX = llX;
-        *lpllY = llY;
-        return TRUE;
+        llRegionLeft = (std::max)(llRegionLeft, 0LL);
+        llRegionTop = (std::max)(llRegionTop, 0LL);
+        llRegionRight = (std::min)(llRegionRight, static_cast<LONGLONG>(m_iCols));
+        llRegionBottom = (std::min)(llRegionBottom, static_cast<LONGLONG>(m_iRows));
+        if (llRegionLeft >= llRegionRight || llRegionTop >= llRegionBottom)
+        {
+            sRectVisible = CellRect_t{};
+            return;
+        }
+
+        sRectVisible.iX = static_cast<INT>(llRegionLeft);
+        sRectVisible.iY = static_cast<INT>(llRegionTop);
+        sRectVisible.iWidth = static_cast<INT>(llRegionRight - llRegionLeft);
+        sRectVisible.iHeight = static_cast<INT>(llRegionBottom - llRegionTop);
     }
 
     Buffer::Cell Buffer::MakeBlankCell() const noexcept
@@ -1670,7 +1702,7 @@ namespace GuiTerminal::Internals
         return sCellBlank;
     }
 
-    HRESULT Buffer::InitializeRegionCells(_Inout_ Region_s& sRegion) const noexcept
+    HRESULT Buffer::InitializeRegionCells(_Inout_ Region_t& sRegion) const noexcept
     {
         try
         {
@@ -1687,7 +1719,7 @@ namespace GuiTerminal::Internals
         return S_OK;
     }
 
-    HRESULT Buffer::ResizeRegionCells(_In_ const Region_s& sRegionSource, _Out_ std::vector<Cell>& vecCellsTarget,
+    HRESULT Buffer::ResizeRegionCells(_In_ const Region_t& sRegionSource, _Out_ std::vector<Cell>& vecCellsTarget,
                                       _In_ INT iWidthTarget, _In_ INT iHeightTarget) const noexcept
     {
         INT iCopyWidth;
@@ -1726,13 +1758,13 @@ namespace GuiTerminal::Internals
         return S_OK;
     }
 
-    VOID Buffer::ClearRegionCells(_Inout_ Region_s& sRegion) const noexcept
+    VOID Buffer::ClearRegionCells(_Inout_ Region_t& sRegion) const noexcept
     {
         std::fill(sRegion.vecCells.begin(), sRegion.vecCells.end(), MakeBlankCell());
     }
 
-    VOID Buffer::SetCell(_Inout_ Region_s& sRegion, _In_ INT iX, _In_ INT iY, _In_ WCHAR chCodepointW,
-                         _In_ const Attributes& sAttributesCell) noexcept
+    VOID Buffer::SetCell(_Inout_ Region_t& sRegion, _In_ INT iX, _In_ INT iY, _In_ WCHAR chCodepointW,
+                         _In_ const Attributes_t& sAttributesCell) noexcept
     {
         SIZE_T uIndex;
 
@@ -1748,13 +1780,13 @@ namespace GuiTerminal::Internals
         sRegion.vecCells[uIndex].bIsDirty = TRUE;
     }
 
-    VOID Buffer::FillCell(_Inout_ Region_s& sRegion, _In_ INT iX, _In_ INT iY, _In_ const Attributes& sAttributesCell) noexcept
+    VOID Buffer::FillCell(_Inout_ Region_t& sRegion, _In_ INT iX, _In_ INT iY, _In_ const Attributes_t& sAttributesCell) noexcept
     {
         SetCell(sRegion, iX, iY, L' ', sAttributesCell);
     }
 
-    VOID Buffer::FillRange(_Inout_ Region_s& sRegion, _In_ INT iXStart, _In_ INT iYStart, _In_ INT iXEnd, _In_ INT iYEnd,
-                           _In_ const Attributes& sAttributesCell) noexcept
+    VOID Buffer::FillRange(_Inout_ Region_t& sRegion, _In_ INT iXStart, _In_ INT iYStart, _In_ INT iXEnd, _In_ INT iYEnd,
+                           _In_ const Attributes_t& sAttributesCell) noexcept
     {
         INT iY;
         INT iX;
@@ -1774,7 +1806,7 @@ namespace GuiTerminal::Internals
         return ((iX >= iStartX) && (iX <= iEndX) && (iY >= iStartY) && (iY <= iEndY)) ? TRUE : FALSE;
     }
 
-    const Buffer::Cell* Buffer::GetCell(_In_ const Region_s& sRegion, _In_ INT iX, _In_ INT iY) const noexcept
+    const Buffer::Cell* Buffer::GetCell(_In_ const Region_t& sRegion, _In_ INT iX, _In_ INT iY) const noexcept
     {
         SIZE_T uIndex;
 
@@ -1785,8 +1817,8 @@ namespace GuiTerminal::Internals
         return &sRegion.vecCells[uIndex];
     }
 
-    VOID Buffer::DrawStrokeCell(_Inout_ Region_s& sRegion, _In_ INT iX, _In_ INT iY, _In_ DWORD dwStrokeType, _In_ BYTE byUp,
-                                _In_ BYTE byRight, _In_ BYTE byDown, _In_ BYTE byLeft, _In_ const Attributes& sAttributesCell) noexcept
+    VOID Buffer::DrawStrokeCell(_Inout_ Region_t& sRegion, _In_ INT iX, _In_ INT iY, _In_ DWORD dwStrokeType, _In_ BYTE byUp,
+                                _In_ BYTE byRight, _In_ BYTE byDown, _In_ BYTE byLeft, _In_ const Attributes_t& sAttributesCell) noexcept
     {
         const Cell* lpsCellCurrent;
         WCHAR chGlyphW;
@@ -1824,39 +1856,41 @@ namespace GuiTerminal::Internals
         SetCell(sRegion, iX, iY, chGlyphW, sAttributesCell);
     }
 
-    BOOL Buffer::ClipRectangle(_In_ const Region_s& sRegion, _In_ INT iX, _In_ INT iY, _In_ INT iWidth, _In_ INT iHeight,
-                               _Out_ LPINT lpiStartX, _Out_ LPINT lpiStartY, _Out_ LPINT lpiEndX,
-                               _Out_ LPINT lpiEndY) const noexcept
+    BOOL Buffer::ClipRectangle(_In_ const Region_t& sRegion, _In_ const CellRect_t& sRectSource, _Out_ CellRect_t& sRectClipped) const noexcept
     {
-        long long llStartX;
-        long long llStartY;
-        long long llEndXExclusive;
-        long long llEndYExclusive;
+        LONGLONG llStartX;
+        LONGLONG llStartY;
+        LONGLONG llEndXExclusive;
+        LONGLONG llEndYExclusive;
 
-        if ((!lpiStartX) || (!lpiStartY) || (!lpiEndX) || (!lpiEndY) || iWidth <= 0 || iHeight <= 0)
+        if (sRectSource.iWidth <= 0 || sRectSource.iHeight <= 0)
         {
+            sRectClipped = CellRect_t{};
             return FALSE;
         }
 
-        llStartX = static_cast<long long>(iX);
-        llStartY = static_cast<long long>(iY);
-        llEndXExclusive = llStartX + static_cast<long long>(iWidth);
-        llEndYExclusive = llStartY + static_cast<long long>(iHeight);
+        llStartX = static_cast<LONGLONG>(sRectSource.iX);
+        llStartY = static_cast<LONGLONG>(sRectSource.iY);
+        llEndXExclusive = llStartX + static_cast<LONGLONG>(sRectSource.iWidth);
+        llEndYExclusive = llStartY + static_cast<LONGLONG>(sRectSource.iHeight);
         if (llEndXExclusive <= 0 || llEndYExclusive <= 0 || llStartX >= sRegion.iWidth || llStartY >= sRegion.iHeight)
         {
+            sRectClipped = CellRect_t{};
             return FALSE;
         }
 
-        *lpiStartX = static_cast<INT>((std::max)(llStartX, 0LL));
-        *lpiStartY = static_cast<INT>((std::max)(llStartY, 0LL));
-        *lpiEndX = static_cast<INT>((std::min)(llEndXExclusive, static_cast<long long>(sRegion.iWidth)) - 1LL);
-        *lpiEndY = static_cast<INT>((std::min)(llEndYExclusive, static_cast<long long>(sRegion.iHeight)) - 1LL);
-        return (*lpiStartX <= *lpiEndX && *lpiStartY <= *lpiEndY) ? TRUE : FALSE;
+        sRectClipped.iX = static_cast<INT>((std::max)(llStartX, 0LL));
+        sRectClipped.iY = static_cast<INT>((std::max)(llStartY, 0LL));
+        sRectClipped.iWidth = static_cast<INT>((std::min)(llEndXExclusive, static_cast<LONGLONG>(sRegion.iWidth)) -
+                                               static_cast<LONGLONG>(sRectClipped.iX));
+        sRectClipped.iHeight = static_cast<INT>((std::min)(llEndYExclusive, static_cast<LONGLONG>(sRegion.iHeight)) -
+                                                static_cast<LONGLONG>(sRectClipped.iY));
+        return (sRectClipped.iWidth > 0 && sRectClipped.iHeight > 0) ? TRUE : FALSE;
     }
 
     VOID Buffer::ScrollRegionUp(_In_opt_ RegionHandle hRegion, _In_ INT iLineCount) noexcept
     {
-        Region_s* lpsRegionCurrent;
+        Region_t* lpsRegionCurrent;
         INT iY;
         INT iX;
         SIZE_T uSourceIndex;
@@ -1896,7 +1930,7 @@ namespace GuiTerminal::Internals
 
     VOID Buffer::ScrollRegionDown(_In_opt_ RegionHandle hRegion, _In_ INT iLineCount) noexcept
     {
-        Region_s* lpsRegionCurrent;
+        Region_t* lpsRegionCurrent;
         INT iY;
         INT iX;
         SIZE_T uSourceIndex;
@@ -1935,7 +1969,7 @@ namespace GuiTerminal::Internals
 
     VOID Buffer::AdvanceCursorAfterWrite(_In_opt_ RegionHandle hRegion) noexcept
     {
-        Region_s* lpsRegionCurrent;
+        Region_t* lpsRegionCurrent;
 
         lpsRegionCurrent = ResolveRegion(hRegion);
         if (!lpsRegionCurrent)
@@ -1968,8 +2002,9 @@ namespace GuiTerminal::Internals
         return TRUE;
     }
 
-    HRESULT Buffer::ComposeRegion(_In_ const Region_s& sRegion) const noexcept
+    HRESULT Buffer::ComposeRegion(_In_ const Region_t& sRegion) const noexcept
     {
+        CellRect_t sRectVisible;
         INT iLocalStartX;
         INT iLocalStartY;
         INT iLocalEndX;
@@ -1980,27 +2015,20 @@ namespace GuiTerminal::Internals
         INT iTerminalY;
         SIZE_T uSourceIndex;
         SIZE_T uTargetIndex;
-        long long llOriginX;
-        long long llOriginY;
-        long long llRegionRight;
-        long long llRegionBottom;
+        LONGLONG llOriginX;
+        LONGLONG llOriginY;
 
-        if (GetRegionTerminalOrigin(sRegion, &llOriginX, &llOriginY) == FALSE)
-        {
-            return E_UNEXPECTED;
-        }
-
-        llRegionRight = llOriginX + static_cast<long long>(sRegion.iWidth);
-        llRegionBottom = llOriginY + static_cast<long long>(sRegion.iHeight);
-        if (llRegionRight <= 0 || llRegionBottom <= 0 || llOriginX >= m_iCols || llOriginY >= m_iRows)
+        GetRegionTerminalOrigin(sRegion, llOriginX, llOriginY);
+        GetRegionVisibleTerminalRect(sRegion, sRectVisible);
+        if (sRectVisible.iWidth <= 0 || sRectVisible.iHeight <= 0)
         {
             return S_OK;
         }
 
-        iLocalStartX = static_cast<INT>((std::max)(0LL, -llOriginX));
-        iLocalStartY = static_cast<INT>((std::max)(0LL, -llOriginY));
-        iLocalEndX = static_cast<INT>((std::min)(static_cast<long long>(sRegion.iWidth), static_cast<long long>(m_iCols) - llOriginX));
-        iLocalEndY = static_cast<INT>((std::min)(static_cast<long long>(sRegion.iHeight), static_cast<long long>(m_iRows) - llOriginY));
+        iLocalStartX = static_cast<INT>(static_cast<LONGLONG>(sRectVisible.iX) - llOriginX);
+        iLocalStartY = static_cast<INT>(static_cast<LONGLONG>(sRectVisible.iY) - llOriginY);
+        iLocalEndX = iLocalStartX + sRectVisible.iWidth;
+        iLocalEndY = iLocalStartY + sRectVisible.iHeight;
         if (iLocalStartX >= iLocalEndX || iLocalStartY >= iLocalEndY)
         {
             return S_OK;
@@ -2008,10 +2036,10 @@ namespace GuiTerminal::Internals
 
         for (iLocalY = iLocalStartY; iLocalY < iLocalEndY; ++iLocalY)
         {
-            iTerminalY = static_cast<INT>(llOriginY + static_cast<long long>(iLocalY));
+            iTerminalY = static_cast<INT>(llOriginY + static_cast<LONGLONG>(iLocalY));
             for (iLocalX = iLocalStartX; iLocalX < iLocalEndX; ++iLocalX)
             {
-                iTerminalX = static_cast<INT>(llOriginX + static_cast<long long>(iLocalX));
+                iTerminalX = static_cast<INT>(llOriginX + static_cast<LONGLONG>(iLocalX));
                 if (GetCellIndex(iLocalX, iLocalY, sRegion.iWidth, &uSourceIndex) != FALSE &&
                     GetCellIndex(iTerminalX, iTerminalY, m_iCols, &uTargetIndex) != FALSE)
                 {
@@ -2024,7 +2052,7 @@ namespace GuiTerminal::Internals
         return S_OK;
     }
 
-    HRESULT Buffer::ComposeRegionTree(_In_ const Region_s& sRegionParent) const noexcept
+    HRESULT Buffer::ComposeRegionTree(_In_ const Region_t& sRegionParent) const noexcept
     {
         HRESULT hr;
 
@@ -2056,7 +2084,7 @@ namespace GuiTerminal::Internals
     VOID Buffer::ApplySgrColor(_In_ RegionHandle hRegion, _In_reads_(uParamsCount) LPINT lpiParams, _In_ SIZE_T uParamsCount,
                                _Inout_ PSIZE_T lpuIndex, _In_ BOOL bForeground) noexcept
     {
-        Region_s* lpsRegionCurrent;
+        Region_t* lpsRegionCurrent;
         SIZE_T uIndex;
         INT iMode;
         COLORREF crColor;
@@ -2110,7 +2138,7 @@ namespace GuiTerminal::Internals
 
     VOID Buffer::AdvanceToNextTabStop(_In_opt_ RegionHandle hRegion) noexcept
     {
-        Region_s* lpsRegionCurrent;
+        Region_t* lpsRegionCurrent;
         INT iNextStop;
         INT iStop;
 
@@ -2356,12 +2384,12 @@ static COLORREF MakeColor(_In_ BYTE byRed, _In_ BYTE byGreen, _In_ BYTE byBlue) 
     return RGB(byRed, byGreen, byBlue);
 }
 
-static GuiTerminal::Internals::Attributes MakeAttributes(_In_ COLORREF crForeground, _In_ COLORREF crBackground,
-                                                         _In_ DWORD dwStyleFlags) noexcept
+static GuiTerminal::Internals::Attributes_t MakeAttributes(_In_ COLORREF crForeground, _In_ COLORREF crBackground,
+                                                           _In_ DWORD dwStyleFlags) noexcept
 {
-    GuiTerminal::Internals::Attributes attributesCell;
+    GuiTerminal::Internals::Attributes_t attributesCell;
 
-    attributesCell = GuiTerminal::Internals::Attributes{};
+    attributesCell = GuiTerminal::Internals::Attributes_t{};
     attributesCell.crForeground = crForeground;
     attributesCell.crBackground = crBackground;
     attributesCell.dwStyleFlags = dwStyleFlags;
