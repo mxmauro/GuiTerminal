@@ -36,6 +36,8 @@ edit scope guidance, or validation commands.
 - Treat the demo as a real consumer. If behavior changes materially, update or extend it.
 - Use `apply_patch` for edits, keep CRLF, and run `utils/fixeol.bat` on touched files before finishing.
 - Keep lines within the repo's 140-character limit and pack wrapped signatures/calls efficiently instead of using one-argument-per-line formatting by default.
+- Align multiline declarations and expressions to the outer opening parenthesis, keep exactly one blank line between function definitions, and use project typedef struct/enum forms.
+- Use classic fixed-size arrays for file-local lookup tables and comment namespace or `extern "C"` closing braces with the scope name.
 
 ## Change Map
 

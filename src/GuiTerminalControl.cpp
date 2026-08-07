@@ -12,21 +12,25 @@
 namespace GuiTerminal {
 
 std::mutex Control::m_mutex;
-std::unordered_map<HWND, Control*> Control::m_mapControls;
+std::unordered_map<HWND, Control *> Control::m_mapControls;
 
-}
+} // namespace GuiTerminal
 
 // -----------------------------------------------------------------------------
 
-static HRESULT FormatWideStringV(_In_z_ LPCWSTR pszFormatW, _In_ va_list argList, _Out_ std::wstring& strTextW) noexcept;
+static UINT uWindowMessageBlinkRedraw = 0U;
+
+// -----------------------------------------------------------------------------
+
+static HRESULT FormatWideStringV(_In_z_ LPCWSTR pszFormatW, _In_ va_list argList, _Out_ std::wstring &strTextW) noexcept;
 
 // -----------------------------------------------------------------------------
 
 namespace GuiTerminal {
 
-HRESULT Control::Create(_In_ HWND hWnd, _In_ const Config& configControl, _Out_ Control** lplpControl) noexcept
+HRESULT Control::Create(_In_ HWND hWnd, _In_ const Config &configControl, _Out_ Control **lplpControl) noexcept
 {
-    Control* lpControl;
+    Control *lpControl;
     HRESULT hr;
 
     if (!lplpControl)
@@ -43,6 +47,12 @@ HRESULT Control::Create(_In_ HWND hWnd, _In_ const Config& configControl, _Out_ 
         configControl.fFontSize <= 0.0f)
     {
         return E_INVALIDARG;
+    }
+
+    uWindowMessageBlinkRedraw = RegisterWindowMessageW(L"GuiTerminalBlickRedrawMsg");
+    if (uWindowMessageBlinkRedraw == 0U)
+    {
+        return HRESULT_FROM_WIN32(GetLastError());
     }
 
     lpControl = new (std::nothrow) Control();
@@ -77,9 +87,9 @@ HRESULT Control::Create(_In_ HWND hWnd, _In_ const Config& configControl, _Out_ 
     return S_OK;
 }
 
-BOOL Control::WndProc(_In_ HWND hWnd, _In_ UINT uMessage, _In_ WPARAM wParam, _In_ LPARAM lParam, _Out_ LRESULT* lplResult) noexcept
+BOOL Control::WndProc(_In_ HWND hWnd, _In_ UINT uMessage, _In_ WPARAM wParam, _In_ LPARAM lParam, _Out_ LRESULT *lplResult) noexcept
 {
-    Control* lpControl;
+    Control *lpControl;
 
     if (!lplResult)
     {
@@ -93,138 +103,134 @@ BOOL Control::WndProc(_In_ HWND hWnd, _In_ UINT uMessage, _In_ WPARAM wParam, _I
         return FALSE;
     }
 
+    if (uMessage == uWindowMessageBlinkRedraw)
+    {
+        InvalidateRect(hWnd, nullptr, FALSE);
+        return TRUE;
+    }
+
     switch (uMessage)
     {
-        case WM_ERASEBKGND:
-            *lplResult = 1;
-            return TRUE;
+    case WM_ERASEBKGND:
+        *lplResult = 1;
+        return TRUE;
 
-        case WM_PAINT:
-            {
-                PAINTSTRUCT sPs;
+    case WM_PAINT: {
+        PAINTSTRUCT sPs;
 
-                if (BeginPaint(hWnd, &sPs))
-                {
-                    lpControl->Present();
-                    EndPaint(hWnd, &sPs);
-                }
+        if (BeginPaint(hWnd, &sPs))
+        {
+            lpControl->Present();
+            EndPaint(hWnd, &sPs);
+        }
 
-                return TRUE;
-            }
+        return TRUE;
+    }
 
-        case WindowMessageBlinkRedraw:
+    case WM_SIZE: {
+        RECT rcClient;
+
+        if (GetClientRect(hWnd, &rcClient) != FALSE)
+        {
+            lpControl->ResizeRenderTarget(static_cast<UINT>(rcClient.right - rcClient.left),
+                                          static_cast<UINT>(rcClient.bottom - rcClient.top));
+            InvalidateRect(hWnd, nullptr, FALSE);
+        }
+    }
+    break;
+
+    case WM_DPICHANGED: {
+        LPRECT lprcSuggested;
+
+        lprcSuggested = reinterpret_cast<LPRECT>(lParam);
+        if (lprcSuggested)
+        {
+            SetWindowPos(hWnd, nullptr, lprcSuggested->left, lprcSuggested->top, lprcSuggested->right - lprcSuggested->left,
+                         lprcSuggested->bottom - lprcSuggested->top, SWP_NOZORDER | SWP_NOACTIVATE);
+        }
+        lpControl->RefreshDpi();
+        InvalidateRect(hWnd, nullptr, FALSE);
+    }
+    break;
+
+    case WM_MOUSEMOVE:
+        if (lpControl->HandleMouseMove(GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)) != FALSE)
+        {
             InvalidateRect(hWnd, nullptr, FALSE);
             return TRUE;
+        }
+        break;
 
-        case WM_SIZE:
+    case WM_MOUSELEAVE:
+        if (lpControl->HandleMouseLeave() != FALSE)
+        {
+            InvalidateRect(hWnd, nullptr, FALSE);
+            return TRUE;
+        }
+        break;
+
+    case WM_LBUTTONDOWN: {
+        BOOL bBeginCapture;
+        INT iX;
+        INT iY;
+
+        bBeginCapture = FALSE;
+        iX = GET_X_LPARAM(lParam);
+        iY = GET_Y_LPARAM(lParam);
+        if (lpControl->HandleLeftButtonDown(iX, iY, &bBeginCapture) != FALSE)
+        {
+            if (bBeginCapture != FALSE)
             {
-                RECT rcClient;
-
-                if (GetClientRect(hWnd, &rcClient) != FALSE)
-                {
-                    lpControl->ResizeRenderTarget(static_cast<UINT>(rcClient.right - rcClient.left),
-                                                  static_cast<UINT>(rcClient.bottom - rcClient.top));
-                    InvalidateRect(hWnd, nullptr, FALSE);
-                }
+                SetCapture(hWnd);
             }
-            break;
+            InvalidateRect(hWnd, nullptr, FALSE);
+            return TRUE;
+        }
+    }
+    break;
 
-        case WM_DPICHANGED:
-            {
-                LPRECT lprcSuggested;
-
-                lprcSuggested = reinterpret_cast<LPRECT>(lParam);
-                if (lprcSuggested)
-                {
-                    SetWindowPos(hWnd, nullptr, lprcSuggested->left, lprcSuggested->top,
-                                 lprcSuggested->right - lprcSuggested->left, lprcSuggested->bottom - lprcSuggested->top,
-                                 SWP_NOZORDER | SWP_NOACTIVATE);
-                }
-                lpControl->RefreshDpi();
-                InvalidateRect(hWnd, nullptr, FALSE);
-            }
-            break;
-
-        case WM_MOUSEMOVE:
-            if (lpControl->HandleMouseMove(GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)) != FALSE)
-            {
-                InvalidateRect(hWnd, nullptr, FALSE);
-                return TRUE;
-            }
-            break;
-
-        case WM_MOUSELEAVE:
-            if (lpControl->HandleMouseLeave() != FALSE)
-            {
-                InvalidateRect(hWnd, nullptr, FALSE);
-                return TRUE;
-            }
-            break;
-
-        case WM_LBUTTONDOWN:
-            {
-                BOOL bBeginCapture;
-                INT iX;
-                INT iY;
-
-                bBeginCapture = FALSE;
-                iX = GET_X_LPARAM(lParam);
-                iY = GET_Y_LPARAM(lParam);
-                if (lpControl->HandleLeftButtonDown(iX, iY, &bBeginCapture) != FALSE)
-                {
-                    if (bBeginCapture != FALSE)
-                    {
-                        SetCapture(hWnd);
-                    }
-                    InvalidateRect(hWnd, nullptr, FALSE);
-                    return TRUE;
-                }
-            }
-            break;
-
-        case WM_LBUTTONUP:
-            if (lpControl->HandleLeftButtonUp() != FALSE)
-            {
-                if (GetCapture() == hWnd)
-                {
-                    ReleaseCapture();
-                }
-                InvalidateRect(hWnd, nullptr, FALSE);
-                return TRUE;
-            }
-            break;
-
-        case WM_MOUSEWHEEL:
-            if (lpControl->HandleMouseWheel(GET_WHEEL_DELTA_WPARAM(wParam)) != FALSE)
-            {
-                InvalidateRect(hWnd, nullptr, FALSE);
-                return TRUE;
-            }
-            break;
-
-        case WM_NCDESTROY:
-            {
-                std::lock_guard<std::mutex> lockGuard(m_mutex);
-
-                m_mapControls.erase(hWnd);
-            }
-            lpControl->StopBlinkThread();
+    case WM_LBUTTONUP:
+        if (lpControl->HandleLeftButtonUp() != FALSE)
+        {
             if (GetCapture() == hWnd)
             {
                 ReleaseCapture();
             }
+            InvalidateRect(hWnd, nullptr, FALSE);
+            return TRUE;
+        }
+        break;
 
-            delete lpControl;
-            break;
+    case WM_MOUSEWHEEL:
+        if (lpControl->HandleMouseWheel(GET_WHEEL_DELTA_WPARAM(wParam)) != FALSE)
+        {
+            InvalidateRect(hWnd, nullptr, FALSE);
+            return TRUE;
+        }
+        break;
+
+    case WM_NCDESTROY: {
+        std::lock_guard<std::mutex> lockGuard(m_mutex);
+
+        m_mapControls.erase(hWnd);
+    }
+        lpControl->StopBlinkThread();
+        if (GetCapture() == hWnd)
+        {
+            ReleaseCapture();
+        }
+
+        delete lpControl;
+        break;
     }
 
     return FALSE;
 }
 
-Control* Control::GetControl(_In_ HWND hWnd)
+Control *Control::GetControl(_In_ HWND hWnd)
 {
     std::lock_guard<std::mutex> lockGuard(m_mutex);
-    std::unordered_map<HWND, Control*>::const_iterator itControl;
+    std::unordered_map<HWND, Control *>::const_iterator itControl;
 
     itControl = m_mapControls.find(hWnd);
     if (itControl == m_mapControls.end())
@@ -238,25 +244,14 @@ VOID Control::Clear() noexcept
 {
     std::lock_guard<std::mutex> lockGuard(m_mutex);
 
-    m_sBuffer.ClearRegion(nullptr);
+    m_sBuffer.Clear(nullptr);
 }
 
 VOID Control::Scroll(_In_ INT iLineCount) noexcept
 {
     std::lock_guard<std::mutex> lockGuard(m_mutex);
 
-    m_sBuffer.ScrollRegion(nullptr, iLineCount);
-}
-
-VOID Control::FillArea(_In_ INT iX, _In_ INT iY, _In_ INT iWidth, _In_ INT iHeight, _In_ WCHAR chCodepointW,
-                       _In_ COLORREF crForeground, _In_ COLORREF crBackground, _In_ DWORD dwStyleFlags) noexcept
-{
-    std::lock_guard<std::mutex> lockGuard(m_mutex);
-
-    if (iWidth > 0 && iHeight > 0)
-    {
-        m_sBuffer.FillArea(nullptr, iX, iY, iWidth, iHeight, chCodepointW, crForeground, crBackground, dwStyleFlags);
-    }
+    m_sBuffer.Scroll(nullptr, iLineCount);
 }
 
 VOID Control::Move(_In_ INT iSourceX, _In_ INT iSourceY, _In_ INT iWidth, _In_ INT iHeight, _In_ INT iTargetX, _In_ INT iTargetY,
@@ -264,11 +259,15 @@ VOID Control::Move(_In_ INT iSourceX, _In_ INT iSourceY, _In_ INT iWidth, _In_ I
 {
     std::lock_guard<std::mutex> lockGuard(m_mutex);
 
-    if (iWidth > 0 && iHeight > 0)
-    {
-        m_sBuffer.MoveArea(nullptr, iSourceX, iSourceY, iWidth, iHeight, iTargetX, iTargetY, chFillW, crForeground, crBackground,
-                           dwStyleFlags);
-    }
+    m_sBuffer.Move(nullptr, iSourceX, iSourceY, iWidth, iHeight, iTargetX, iTargetY, chFillW, crForeground, crBackground, dwStyleFlags);
+}
+
+VOID Control::Fill(_In_ INT iX, _In_ INT iY, _In_ INT iWidth, _In_ INT iHeight, _In_ WCHAR chCodepointW, _In_ COLORREF crForeground,
+                   _In_ COLORREF crBackground, _In_ DWORD dwStyleFlags) noexcept
+{
+    std::lock_guard<std::mutex> lockGuard(m_mutex);
+
+    m_sBuffer.Fill(nullptr, iX, iY, iWidth, iHeight, chCodepointW, crForeground, crBackground, dwStyleFlags);
 }
 
 VOID Control::DrawHorizontalLine(_In_ INT iX, _In_ INT iY, _In_ INT iWidth, _In_ StrokeType strokeType, _In_ COLORREF crForeground,
@@ -287,8 +286,8 @@ VOID Control::DrawVerticalLine(_In_ INT iX, _In_ INT iY, _In_ INT iHeight, _In_ 
     m_sBuffer.DrawVerticalLine(nullptr, iX, iY, iHeight, strokeType, crForeground, crBackground, dwStyleFlags);
 }
 
-VOID Control::DrawBox(_In_ INT iX, _In_ INT iY, _In_ INT iWidth, _In_ INT iHeight, _In_ DWORD dwBoxSideFlags,
-                      _In_ COLORREF crForeground, _In_ COLORREF crBackground, _In_ DWORD dwStyleFlags) noexcept
+VOID Control::DrawBox(_In_ INT iX, _In_ INT iY, _In_ INT iWidth, _In_ INT iHeight, _In_ DWORD dwBoxSideFlags, _In_ COLORREF crForeground,
+                      _In_ COLORREF crBackground, _In_ DWORD dwStyleFlags) noexcept
 {
     std::lock_guard<std::mutex> lockGuard(m_mutex);
 
@@ -351,20 +350,20 @@ PVOID Control::GetContext() const noexcept
     return m_sBuffer.GetRegionContext(nullptr);
 }
 
-HRESULT Control::CreateRegion(_In_ INT iX, _In_ INT iY, _In_ INT iWidth, _In_ INT iHeight, _Out_ RegionHandle* lphRegion,
+HRESULT Control::CreateRegion(_In_ INT iX, _In_ INT iY, _In_ INT iWidth, _In_ INT iHeight, _Out_ RegionHandle *lphRegion,
                               _In_opt_ RegionHandle hRegionParent) noexcept
 {
     std::lock_guard<std::mutex> lockGuard(m_mutex);
 
-    if (!lphRegion)
-    {
-        return E_POINTER;
-    }
-    if (iWidth <= 0 || iHeight <= 0)
-    {
-        return E_INVALIDARG;
-    }
     return m_sBuffer.CreateRegion(iX, iY, iWidth, iHeight, lphRegion, hRegionParent);
+}
+
+HRESULT Control::CreateCustomDrawRegion(_In_ INT iX, _In_ INT iY, _In_ INT iWidth, _In_ INT iHeight, _Out_ RegionHandle *lphRegion,
+                                        _In_ const CustomDrawCallback &fnDrawCallback, _In_opt_ RegionHandle hRegionParent) noexcept
+{
+    std::lock_guard<std::mutex> lockGuard(m_mutex);
+
+    return m_sBuffer.CreateCustomDrawRegion(iX, iY, iWidth, iHeight, lphRegion, fnDrawCallback, hRegionParent);
 }
 
 VOID Control::DestroyRegion(_In_ RegionHandle hRegion) noexcept
@@ -381,53 +380,52 @@ VOID Control::ClearRegion(_In_opt_ RegionHandle hRegion) noexcept
 {
     std::lock_guard<std::mutex> lockGuard(m_mutex);
 
-    m_sBuffer.ClearRegion(hRegion);
+    m_sBuffer.Clear(hRegion);
+}
+
+VOID Control::InvalidateRegion(_In_opt_ RegionHandle hRegion) noexcept
+{
+    (void)hRegion;
+    if (m_hWnd)
+    {
+        InvalidateRect(m_hWnd, nullptr, FALSE);
+    }
 }
 
 VOID Control::ScrollRegion(_In_opt_ RegionHandle hRegion, _In_ INT iLineCount) noexcept
 {
     std::lock_guard<std::mutex> lockGuard(m_mutex);
 
-    m_sBuffer.ScrollRegion(hRegion, iLineCount);
-}
-
-VOID Control::FillRegionArea(_In_opt_ RegionHandle hRegion, _In_ INT iX, _In_ INT iY, _In_ INT iWidth, _In_ INT iHeight,
-                             _In_ WCHAR chCodepointW, _In_ COLORREF crForeground, _In_ COLORREF crBackground,
-                             _In_ DWORD dwStyleFlags) noexcept
-{
-    std::lock_guard<std::mutex> lockGuard(m_mutex);
-
-    if (iWidth > 0 && iHeight > 0)
-    {
-        m_sBuffer.FillArea(hRegion, iX, iY, iWidth, iHeight, chCodepointW, crForeground, crBackground, dwStyleFlags);
-    }
+    m_sBuffer.Scroll(hRegion, iLineCount);
 }
 
 VOID Control::MoveRegion(_In_opt_ RegionHandle hRegion, _In_ INT iSourceX, _In_ INT iSourceY, _In_ INT iWidth, _In_ INT iHeight,
-                         _In_ INT iTargetX, _In_ INT iTargetY, _In_ WCHAR chFillW, _In_ COLORREF crForeground,
-                         _In_ COLORREF crBackground, _In_ DWORD dwStyleFlags) noexcept
+                         _In_ INT iTargetX, _In_ INT iTargetY, _In_ WCHAR chFillW, _In_ COLORREF crForeground, _In_ COLORREF crBackground,
+                         _In_ DWORD dwStyleFlags) noexcept
 {
     std::lock_guard<std::mutex> lockGuard(m_mutex);
 
-    if (iWidth > 0 && iHeight > 0)
-    {
-        m_sBuffer.MoveArea(hRegion, iSourceX, iSourceY, iWidth, iHeight, iTargetX, iTargetY, chFillW, crForeground, crBackground,
-                           dwStyleFlags);
-    }
+    m_sBuffer.Move(hRegion, iSourceX, iSourceY, iWidth, iHeight, iTargetX, iTargetY, chFillW, crForeground, crBackground, dwStyleFlags);
 }
 
-VOID Control::DrawRegionHorizontalLine(_In_opt_ RegionHandle hRegion, _In_ INT iX, _In_ INT iY, _In_ INT iWidth,
-                                       _In_ StrokeType strokeType, _In_ COLORREF crForeground, _In_ COLORREF crBackground,
-                                       _In_ DWORD dwStyleFlags) noexcept
+VOID Control::FillRegion(_In_opt_ RegionHandle hRegion, _In_ INT iX, _In_ INT iY, _In_ INT iWidth, _In_ INT iHeight,
+                         _In_ WCHAR chCodepointW, _In_ COLORREF crForeground, _In_ COLORREF crBackground, _In_ DWORD dwStyleFlags) noexcept
+{
+    std::lock_guard<std::mutex> lockGuard(m_mutex);
+
+    m_sBuffer.Fill(hRegion, iX, iY, iWidth, iHeight, chCodepointW, crForeground, crBackground, dwStyleFlags);
+}
+
+VOID Control::DrawRegionHorizontalLine(_In_opt_ RegionHandle hRegion, _In_ INT iX, _In_ INT iY, _In_ INT iWidth, _In_ StrokeType strokeType,
+                                       _In_ COLORREF crForeground, _In_ COLORREF crBackground, _In_ DWORD dwStyleFlags) noexcept
 {
     std::lock_guard<std::mutex> lockGuard(m_mutex);
 
     m_sBuffer.DrawHorizontalLine(hRegion, iX, iY, iWidth, strokeType, crForeground, crBackground, dwStyleFlags);
 }
 
-VOID Control::DrawRegionVerticalLine(_In_opt_ RegionHandle hRegion, _In_ INT iX, _In_ INT iY, _In_ INT iHeight,
-                                     _In_ StrokeType strokeType, _In_ COLORREF crForeground, _In_ COLORREF crBackground,
-                                     _In_ DWORD dwStyleFlags) noexcept
+VOID Control::DrawRegionVerticalLine(_In_opt_ RegionHandle hRegion, _In_ INT iX, _In_ INT iY, _In_ INT iHeight, _In_ StrokeType strokeType,
+                                     _In_ COLORREF crForeground, _In_ COLORREF crBackground, _In_ DWORD dwStyleFlags) noexcept
 {
     std::lock_guard<std::mutex> lockGuard(m_mutex);
 
@@ -489,14 +487,6 @@ HRESULT Control::RelocateRegion(_In_ RegionHandle hRegion, _In_ INT iX, _In_ INT
 {
     std::lock_guard<std::mutex> lockGuard(m_mutex);
 
-    if (!hRegion)
-    {
-        return E_POINTER;
-    }
-    if (iWidth <= 0 || iHeight <= 0)
-    {
-        return E_INVALIDARG;
-    }
     return m_sBuffer.RelocateRegion(hRegion, iX, iY, iWidth, iHeight);
 }
 
@@ -504,10 +494,6 @@ HRESULT Control::BringRegionToFront(_In_ RegionHandle hRegion) noexcept
 {
     std::lock_guard<std::mutex> lockGuard(m_mutex);
 
-    if (!hRegion)
-    {
-        return E_POINTER;
-    }
     return m_sBuffer.BringRegionToFront(hRegion);
 }
 
@@ -515,10 +501,6 @@ HRESULT Control::SendRegionToBack(_In_ RegionHandle hRegion) noexcept
 {
     std::lock_guard<std::mutex> lockGuard(m_mutex);
 
-    if (!hRegion)
-    {
-        return E_POINTER;
-    }
     return m_sBuffer.SendRegionToBack(hRegion);
 }
 
@@ -526,10 +508,6 @@ HRESULT Control::MoveRegionAfter(_In_ RegionHandle hRegion, _In_opt_ RegionHandl
 {
     std::lock_guard<std::mutex> lockGuard(m_mutex);
 
-    if (!hRegion)
-    {
-        return E_POINTER;
-    }
     return m_sBuffer.MoveRegionAfter(hRegion, hRegionReference);
 }
 
@@ -545,6 +523,21 @@ PVOID Control::GetRegionContext(_In_opt_ RegionHandle hRegion) const noexcept
     std::lock_guard<std::mutex> lockGuard(m_mutex);
 
     return m_sBuffer.GetRegionContext(hRegion);
+}
+
+HRESULT Control::SetRegionDestroyCallback(_In_ RegionHandle hRegion, _In_ const RegionDestroyCallback &fnCallback) noexcept
+{
+    std::lock_guard<std::mutex> lockGuard(m_mutex);
+
+    return m_sBuffer.SetRegionDestroyCallback(hRegion, fnCallback);
+}
+
+HRESULT Control::SetCustomDrawRegionResourceCleanup(_In_ RegionHandle hRegion,
+                                                    _In_ const CustomDrawResourceCleanupCallback &fnCallback) noexcept
+{
+    std::lock_guard<std::mutex> lockGuard(m_mutex);
+
+    return m_sBuffer.SetCustomDrawRegionResourceCleanup(hRegion, fnCallback);
 }
 
 RegionHandle Control::GetFirstRegion() const noexcept
@@ -629,20 +622,6 @@ VOID Control::GetRegionLocation(_In_ RegionHandle hRegion, _Out_opt_ LPINT lpiX,
     m_sBuffer.GetRegionLocation(hRegion, lpiX, lpiY, lpiWidth, lpiHeight);
 }
 
-VOID Control::GetTerminalSize(_Out_opt_ LPINT lpiCols, _Out_opt_ LPINT lpiRows) const noexcept
-{
-    std::lock_guard<std::mutex> lockGuard(m_mutex);
-
-    if (lpiCols)
-    {
-        *lpiCols = m_iCols;
-    }
-    if (lpiRows)
-    {
-        *lpiRows = m_iRows;
-    }
-}
-
 BOOL Control::ConvertToRegionCoordinates(_In_ RegionHandle hRegion, _In_ INT iColTerminal, _In_ INT iRowTerminal,
                                          _Out_opt_ LPINT lpiColRegion, _Out_opt_ LPINT lpiRowRegion) const noexcept
 {
@@ -713,25 +692,18 @@ HRESULT Control::ResizeTerminal(_In_ INT iCols, _In_ INT iRows) noexcept
     return S_OK;
 }
 
-HRESULT Control::GetCellSize(_Out_ LPSIZE lpSize) const noexcept
+VOID Control::GetTerminalSize(_Out_opt_ LPINT lpiCols, _Out_opt_ LPINT lpiRows) const noexcept
 {
     std::lock_guard<std::mutex> lockGuard(m_mutex);
 
-    return m_sRenderer.GetCellSize(lpSize);
-}
-
-BOOL Control::GetCellPosition(_In_ INT iCol, _In_ INT iRow, _Out_ LPRECT lprcCell) const noexcept
-{
-    std::lock_guard<std::mutex> lockGuard(m_mutex);
-
-    return m_sRenderer.GetCellPosition(iCol, iRow, lprcCell);
-}
-
-BOOL Control::GetCellFromPosition(_In_ INT iX, _In_ INT iY, _Out_opt_ LPINT lpiCol, _Out_opt_ LPINT lpiRow) const noexcept
-{
-    std::lock_guard<std::mutex> lockGuard(m_mutex);
-
-    return m_sRenderer.HitTestCell(iX, iY, lpiCol, lpiRow);
+    if (lpiCols)
+    {
+        *lpiCols = m_iCols;
+    }
+    if (lpiRows)
+    {
+        *lpiRows = m_iRows;
+    }
 }
 
 HRESULT Control::GetPreferredClientSize(_Out_ LPSIZE lpSize) const noexcept
@@ -776,7 +748,28 @@ HRESULT Control::GetPreferredWindowSize(_Out_ LPSIZE lpSize, _In_opt_ BOOL bHasM
     return S_OK;
 }
 
-HRESULT Control::Initialize(_In_ HWND hWnd, _In_ const Config& configControl) noexcept
+HRESULT Control::GetCellSize(_Out_ LPSIZE lpSize) const noexcept
+{
+    std::lock_guard<std::mutex> lockGuard(m_mutex);
+
+    return m_sRenderer.GetCellSize(lpSize);
+}
+
+BOOL Control::GetCellPosition(_In_ INT iCol, _In_ INT iRow, _Out_ LPRECT lprcCell) const noexcept
+{
+    std::lock_guard<std::mutex> lockGuard(m_mutex);
+
+    return m_sRenderer.GetCellPosition(iCol, iRow, lprcCell);
+}
+
+BOOL Control::GetCellFromPosition(_In_ INT iX, _In_ INT iY, _Out_opt_ LPINT lpiCol, _Out_opt_ LPINT lpiRow) const noexcept
+{
+    std::lock_guard<std::mutex> lockGuard(m_mutex);
+
+    return m_sRenderer.HitTestCell(iX, iY, lpiCol, lpiRow);
+}
+
+HRESULT Control::Initialize(_In_ HWND hWnd, _In_ const Config &configControl) noexcept
 {
     HRESULT hr;
 
@@ -968,7 +961,7 @@ HRESULT Control::StartBlinkThread() noexcept
     {
         m_threadBlink = std::thread(&Control::BlinkThreadEntry, this);
     }
-    catch (const std::bad_alloc&)
+    catch (const std::bad_alloc &)
     {
         hr = E_OUTOFMEMORY;
     }
@@ -1002,7 +995,7 @@ VOID Control::StopBlinkThread() noexcept
     }
 }
 
-VOID Control::BlinkThreadEntry(_In_ Control* lpControl) noexcept
+VOID Control::BlinkThreadEntry(_In_ Control *lpControl) noexcept
 {
     DWORD dwWaitResult;
 
@@ -1022,16 +1015,16 @@ VOID Control::BlinkThreadEntry(_In_ Control* lpControl) noexcept
         lpControl->ToggleBlink();
         if (lpControl->m_hWnd)
         {
-            PostMessageW(lpControl->m_hWnd, WindowMessageBlinkRedraw, 0U, 0L);
+            PostMessageW(lpControl->m_hWnd, uWindowMessageBlinkRedraw, 0U, 0L);
         }
     }
 }
 
-}
+} // namespace GuiTerminal
 
 // -----------------------------------------------------------------------------
 
-static HRESULT FormatWideStringV(_In_z_ LPCWSTR pszFormatW, _In_ va_list argList, _Out_ std::wstring& strTextW) noexcept
+static HRESULT FormatWideStringV(_In_z_ LPCWSTR pszFormatW, _In_ va_list argList, _Out_ std::wstring &strTextW) noexcept
 {
     va_list argListCopy;
     INT iCharCount;
@@ -1054,7 +1047,7 @@ static HRESULT FormatWideStringV(_In_z_ LPCWSTR pszFormatW, _In_ va_list argList
             strTextW.resize(static_cast<size_t>(iCharCount));
         }
     }
-    catch (const std::bad_alloc&)
+    catch (const std::bad_alloc &)
     {
         return E_OUTOFMEMORY;
     }

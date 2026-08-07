@@ -119,9 +119,19 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="resource.h" />
+    <ClInclude Include="DemoApp.h" />
+    <ClInclude Include="DemoHelpers.h" />
+    <ClInclude Include="DemoLayout.h" />
+    <ClInclude Include="DemoScenes.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="demo.cpp" />
+    <ClCompile Include="DemoMain.cpp" />
+    <ClCompile Include="DemoApp.cpp" />
+    <ClCompile Include="DemoHelpers.cpp" />
+    <ClCompile Include="DemoSceneScroll.cpp" />
+    <ClCompile Include="DemoSceneBoxes.cpp" />
+    <ClCompile Include="DemoSceneNested.cpp" />
+    <ClCompile Include="DemoSceneMove.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="demo.rc" />

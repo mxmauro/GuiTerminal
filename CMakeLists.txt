@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.21)
 
-project(GuiTerminal VERSION 0.7.2 LANGUAGES CXX)
+project(GuiTerminal VERSION 0.8.0 LANGUAGES CXX)
 
 include(CMakePackageConfigHelpers)
 include(GNUInstallDirs)
@@ -17,6 +17,7 @@ endif()
 set(GUITERMINAL_PUBLIC_HEADERS
     include/GuiTerminalBuffer.h
     include/GuiTerminalControl.h
+    include/GuiTerminalDraw.h
     include/GuiTerminalC.h
     include/GuiTerminalParser.h
     include/GuiTerminalRenderer.h
@@ -82,7 +83,17 @@ set_target_properties(GuiTerminal PROPERTIES
 
 if(GUITERMINAL_BUILD_DEMO)
     add_executable(GuiTerminalDemo WIN32
-        demo/demo.cpp
+        demo/DemoMain.cpp
+        demo/DemoApp.cpp
+        demo/DemoHelpers.cpp
+        demo/DemoSceneScroll.cpp
+        demo/DemoSceneBoxes.cpp
+        demo/DemoSceneNested.cpp
+        demo/DemoSceneMove.cpp
+        demo/DemoApp.h
+        demo/DemoHelpers.h
+        demo/DemoLayout.h
+        demo/DemoScenes.h
         demo/demo.rc
         demo/resource.h
         demo/demo.ico

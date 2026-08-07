@@ -28,6 +28,7 @@
   <ItemGroup>
     <ClInclude Include="include\GuiTerminalBuffer.h" />
     <ClInclude Include="include\GuiTerminalControl.h" />
+    <ClInclude Include="include\GuiTerminalDraw.h" />
     <ClInclude Include="include\GuiTerminalC.h" />
     <ClInclude Include="include\GuiTerminalParser.h" />
     <ClInclude Include="include\GuiTerminalRenderer.h" />
@@ -36,6 +37,9 @@
     <None Include="CMakeLists.txt" />
     <None Include="LICENSE" />
     <None Include="README.md" />
+    <None Include="vcpkg\ports\guiterminal\portfile.cmake" />
+    <None Include="vcpkg\ports\guiterminal\usage" />
+    <None Include="vcpkg\ports\guiterminal\vcpkg.json" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>18.0</VCProjectVersion>

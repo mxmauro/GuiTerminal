@@ -18,11 +18,19 @@
     <ClInclude Include="resource.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="DemoApp.h"><Filter>Header Files</Filter></ClInclude>
+    <ClInclude Include="DemoHelpers.h"><Filter>Header Files</Filter></ClInclude>
+    <ClInclude Include="DemoLayout.h"><Filter>Header Files</Filter></ClInclude>
+    <ClInclude Include="DemoScenes.h"><Filter>Header Files</Filter></ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="demo.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
+    <ClCompile Include="DemoMain.cpp"><Filter>Source Files</Filter></ClCompile>
+    <ClCompile Include="DemoApp.cpp"><Filter>Source Files</Filter></ClCompile>
+    <ClCompile Include="DemoHelpers.cpp"><Filter>Source Files</Filter></ClCompile>
+    <ClCompile Include="DemoSceneScroll.cpp"><Filter>Source Files</Filter></ClCompile>
+    <ClCompile Include="DemoSceneBoxes.cpp"><Filter>Source Files</Filter></ClCompile>
+    <ClCompile Include="DemoSceneNested.cpp"><Filter>Source Files</Filter></ClCompile>
+    <ClCompile Include="DemoSceneMove.cpp"><Filter>Source Files</Filter></ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="demo.rc">

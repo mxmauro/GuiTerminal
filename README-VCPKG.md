@@ -29,7 +29,7 @@ git clone C:\Fuentes\VSNet\VCPkgRegistry $tempRegistry
   -RegistryPath $tempRegistry `
   -RegistryKind Git `
   -SourceMode LocalSource `
-  -Version 0.7.2 `
+  -Version 0.8.0 `
   -SourcePath C:\Fuentes\VSNet\Libraries\GuiTerminal
 ```
 
@@ -53,8 +53,8 @@ Remove-Item -Recurse -Force $tempRegistry
 
 ```powershell
 git push origin main
-git tag v0.7.2
-git push origin v0.7.2
+git tag v0.8.0
+git push origin v0.8.0
 ```
 
 2. Generate registry metadata in the real registry clone using the pushed tag.
@@ -64,8 +64,8 @@ git push origin v0.7.2
   -RegistryPath C:\Fuentes\VSNet\VCPkgRegistry `
   -RegistryKind Git `
   -SourceMode GitHub `
-  -Version 0.7.2 `
-  -SourceRef v0.7.2 `
+  -Version 0.8.0 `
+  -SourceRef v0.8.0 `
   -GitHubRepository mxmauro/GuiTerminal
 ```
 
@@ -80,7 +80,7 @@ git -C C:\Fuentes\VSNet\VCPkgRegistry diff
 
 ```powershell
 git -C C:\Fuentes\VSNet\VCPkgRegistry add ports versions
-git -C C:\Fuentes\VSNet\VCPkgRegistry commit -m "Add guiterminal 0.7.2"
+git -C C:\Fuentes\VSNet\VCPkgRegistry commit -m "Add guiterminal 0.8.0"
 git -C C:\Fuentes\VSNet\VCPkgRegistry push origin main
 ```
 

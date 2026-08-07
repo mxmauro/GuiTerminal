@@ -1,0 +1,18 @@
+#pragma once
+
+#define TERMINAL_COLS 160
+#define TERMINAL_ROWS 25
+#define TERMINAL_FONT_FAMILY L"Cascadia Mono"
+#define TERMINAL_FONT_SIZE 12.0f
+
+#define DEMO_SCENE_COUNT 4
+#define DEMO_BUTTON_X 3
+#define DEMO_BUTTON_Y 2
+#define DEMO_BUTTON_WIDTH 36
+#define DEMO_BUTTON_HEIGHT 2
+#define DEMO_BUTTON_GAP 3
+#define DEMO_SCENE_X 1
+#define DEMO_SCENE_Y 5
+#define DEMO_SCENE_WIDTH (TERMINAL_COLS - 2)
+#define DEMO_SCENE_HEIGHT 17
+#define DEMO_STATUS_Y 24

@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
     <Filter Include="Source Files">
@@ -8,6 +8,9 @@
     <Filter Include="Header Files">
       <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
       <Extensions>h;hh;hpp;hxx;h++;hm;inl;inc;ipp;xsd</Extensions>
+    </Filter>
+    <Filter Include="VCPkg Files">
+      <UniqueIdentifier>{a4e34541-a284-44ac-966a-688bf0fc2eba}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -34,6 +37,9 @@
     <ClInclude Include="include\GuiTerminalControl.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="include\GuiTerminalDraw.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="include\GuiTerminalC.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -48,5 +54,14 @@
     <None Include="LICENSE" />
     <None Include="README.md" />
     <None Include="CMakeLists.txt" />
+    <None Include="vcpkg\ports\guiterminal\portfile.cmake">
+      <Filter>VCPkg Files</Filter>
+    </None>
+    <None Include="vcpkg\ports\guiterminal\usage">
+      <Filter>VCPkg Files</Filter>
+    </None>
+    <None Include="vcpkg\ports\guiterminal\vcpkg.json">
+      <Filter>VCPkg Files</Filter>
+    </None>
   </ItemGroup>
 </Project>

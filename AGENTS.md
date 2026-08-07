@@ -7,21 +7,34 @@
   demo code in `demo/`, build and packaging files at the repo root, `cmake/`, `scripts/`,
   and `vcpkg/`.
 
+## Working principles
+- Think before coding. State assumptions explicitly, surface ambiguity or tradeoffs instead of picking silently, and ask for clarification when requirements or nearby code are unclear.
+- Simplicity first. Make the smallest change that solves the task. Do not add speculative abstractions, configurability, or broader refactors that were not requested.
+- Surgical changes. Keep diffs limited to the requested behavior, tests, and directly required project or documentation updates. Do not normalize unrelated formatting or fix adjacent issues unless they block the task. Remove only code or declarations that your change made unused.
+- Goal-driven execution. Define the verification target before editing, prefer focused build or test checks that prove the changed behavior, and broaden validation only as the change scope requires.
+
 ## File format
 - Use CRLF line endings for text files. This repository enforces CRLF in `.gitattributes`, and `utils/fixeol.bat` exists to normalize files.
 - Keep text files ASCII or UTF-8 unless a file already uses another encoding.
 - Do not introduce trailing whitespace.
 
 ## General coding style
+- Use Allman style as the baseline: place opening braces on their own line for declarations,
+  definitions, and control-flow blocks.
+- Always enclose `if`, `do`, `while`, `for`, and `else` bodies in curly braces, including
+  one-line bodies.
 - Indent with 4 spaces in handwritten code.
 - Avoid tabs in handwritten files. If a file is already generator-produced or consistently
   tab-aligned throughout, leave that style in place instead of normalizing it opportunistically.
-- Keep lines at or below 140 characters when practical. Split long statements and parameter lists for readability.
-- Use braces on their own lines for classes, structs, functions, and control-flow blocks.
+- Keep lines at or below 140 characters. Split long statements and parameter lists for readability.
 - Exception: keep the opening brace on the same line for `typedef struct` and `typedef enum` declarations, for example
   `typedef struct Name_s {`.
+- All project-owned structs and enums use typedef declarations with `_s` and `_e` tags respectively.
+- Do not indent declarations or definitions inside `extern "C"` blocks.
 - Use compact namespace formatting in handwritten code: `namespace X {`, and do not add an extra indentation level solely for namespace scope.
-- Keep a blank line between logical sections, but avoid excessive vertical whitespace.
+- Comment every namespace and `extern "C"` closing brace with the scope it closes, for example `} // namespace GuiTerminal`.
+- Keep exactly one blank line between function definitions.
+- Keep a blank line between other logical sections, but avoid excessive vertical whitespace.
 - Use the existing separator comment style when it helps structure a file:
 
 ```cpp
@@ -71,8 +84,9 @@
 - Internal project includes in `.cpp` files currently use quoted relative Windows paths such as
   `"..\\include\\GuiTerminalBuffer.h"`. Match the surrounding file instead of restyling
   include paths.
-- File-local helper declarations should stay `static` and appear near the top of the
-  translation unit before the main namespace or function bodies.
+- Order file-scope declarations as typedefs, constants, variables, static helper declarations, functions, and static helper implementations.
+- File-local helper declarations should stay `static` near the top of the translation unit before the main namespace or function bodies.
+- Within each access level, separate typedefs, methods, and variables into their own explicitly labeled access blocks.
 - Prefer explicit types over `auto`.
 - Exception: `auto` is acceptable for iterator-style loops, `if`/`switch` init-statements,
   and similar cases where the deduced type is obvious and the alternative is noisier,
@@ -87,7 +101,8 @@ GuiTerminal::Control::Config sConfig;
 sConfig = GuiTerminal::Control::Config{};
 ```
 
-- Keep long parameter lists split across lines with the continuation aligned for readability, matching the current style.
+- Keep long parameter lists split across lines with the continuation aligned one character after the outer opening parenthesis.
+- Apply the same parenthesis alignment rule to multiline expressions and declarations.
 - When wrapping declarations, calls, or expressions, fill each line as much as practical up to the
   140-character limit instead of using one-argument-per-line formatting unless readability clearly
   requires it.
@@ -99,6 +114,7 @@ sConfig = GuiTerminal::Control::Config{};
 - Preserve the existing `switch` formatting with `case` labels indented inside the block and `break;` on its own line.
 - Use standard-library helpers exactly as this codebase already does when macro collisions are
   possible, for example `(std::min)(...)` and `(std::max)(...)`.
+- Prefer classic fixed-size arrays over `std::array` for file-local lookup tables.
 - Keep exception handling narrow and compatibility-focused. Where the code catches allocation
   failures, continue mapping `std::bad_alloc` to `E_OUTOFMEMORY` and unexpected exceptions
   to `E_UNEXPECTED`.
@@ -140,7 +156,6 @@ sConfig = GuiTerminal::Control::Config{};
 - Keep demo constants as upper-case macros unless the surrounding code establishes a different pattern.
 
 ## Editing rules for agents
-- Make the smallest change that solves the task.
 - Preserve CRLF after editing. If needed, run `utils/fixeol.bat` or `utils/eolconverter.ps1` on touched text files.
 - Do not reformat entire files unless explicitly requested.
 - Do not replace Win32 types with STL or platform-neutral substitutes just for style.

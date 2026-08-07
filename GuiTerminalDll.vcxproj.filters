@@ -37,6 +37,9 @@
     <ClInclude Include="include\GuiTerminalControl.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="include\GuiTerminalDraw.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="include\GuiTerminalC.h">
       <Filter>Header Files</Filter>
     </ClInclude>

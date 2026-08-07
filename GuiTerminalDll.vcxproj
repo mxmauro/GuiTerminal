@@ -29,6 +29,7 @@
   <ItemGroup>
     <ClInclude Include="include\GuiTerminalBuffer.h" />
     <ClInclude Include="include\GuiTerminalControl.h" />
+    <ClInclude Include="include\GuiTerminalDraw.h" />
     <ClInclude Include="include\GuiTerminalC.h" />
     <ClInclude Include="include\GuiTerminalParser.h" />
     <ClInclude Include="include\GuiTerminalRenderer.h" />
