@@ -77,6 +77,7 @@ HRESULT DemoInitialize(_In_ GuiTerminal::Control *lpGuiTerminal) noexcept
     {
         return hr;
     }
+    // Build every scene once; selecting one later changes only its root-panel visibility.
     hr = InitializeScenes(lpGuiTerminal);
     if (FAILED(hr))
     {
@@ -86,6 +87,15 @@ HRESULT DemoInitialize(_In_ GuiTerminal::Control *lpGuiTerminal) noexcept
     SelectScene(lpGuiTerminal, DemoSceneScroll);
     WriteMouseStatus(lpGuiTerminal, L"Ready", L"", -1, -1, -1, -1);
     return S_OK;
+}
+
+VOID DemoAnimate(_In_ GuiTerminal::Control *lpGuiTerminal) noexcept
+{
+    // Only the custom chart needs a periodic cache invalidation.
+    if (lpGuiTerminal && g_sDemoState.iActiveScene == DemoSceneNested)
+    {
+        DemoAnimateNestedScene(lpGuiTerminal);
+    }
 }
 
 VOID DemoHandleMouseButton(_In_ GuiTerminal::Control *lpGuiTerminal, _In_ BOOL bLeftButton, _In_ BOOL bButtonDown,
@@ -106,7 +116,7 @@ VOID DemoHandleMouseButton(_In_ GuiTerminal::Control *lpGuiTerminal, _In_ BOOL b
         iCol = -1;
         iRow = -1;
     }
-    if ((bLeftButton != FALSE) && (bButtonDown != FALSE))
+    if (bLeftButton != FALSE && bButtonDown != FALSE)
     {
         iSceneHit = HitTestButton(iCol, iRow);
         if (iSceneHit >= 0)
@@ -175,27 +185,32 @@ static HRESULT InitializeScenes(_In_ GuiTerminal::Control *lpGuiTerminal) noexce
         }
         g_sDemoState.arrScenes[iSceneIndex].hRegion = hRegionScene;
         g_sDemoState.arrScenes[iSceneIndex].hCursorRegion = hRegionScene;
+        hr = lpGuiTerminal->SetRegionVisible(hRegionScene, FALSE);
+        if (FAILED(hr))
+        {
+            return hr;
+        }
         switch (iSceneIndex)
         {
-        case DemoSceneScroll:
-            hr = DemoInitializeScrollScene(lpGuiTerminal, hRegionScene, &hCursorRegion);
-            g_sDemoState.arrScenes[iSceneIndex].cursorStyle = GuiTerminal::Control::CursorUnderscore;
-            break;
-        case DemoSceneBoxes:
-            hr = DemoInitializeBoxesScene(lpGuiTerminal, hRegionScene, &hCursorRegion);
-            g_sDemoState.arrScenes[iSceneIndex].cursorStyle = GuiTerminal::Control::CursorBarLeft;
-            break;
-        case DemoSceneNested:
-            hr = DemoInitializeNestedScene(lpGuiTerminal, hRegionScene, &hCursorRegion);
-            g_sDemoState.arrScenes[iSceneIndex].cursorStyle = GuiTerminal::Control::CursorBlock;
-            break;
-        case DemoSceneMove:
-            hr = DemoInitializeMoveScene(lpGuiTerminal, hRegionScene, &hCursorRegion);
-            g_sDemoState.arrScenes[iSceneIndex].cursorStyle = GuiTerminal::Control::CursorBarLeft;
-            break;
-        default:
-            hr = E_UNEXPECTED;
-            break;
+            case DemoSceneScroll:
+                hr = DemoInitializeScrollScene(lpGuiTerminal, hRegionScene, &hCursorRegion);
+                g_sDemoState.arrScenes[iSceneIndex].cursorStyle = GuiTerminal::Control::CursorUnderscore;
+                break;
+            case DemoSceneBoxes:
+                hr = DemoInitializeBoxesScene(lpGuiTerminal, hRegionScene, &hCursorRegion);
+                g_sDemoState.arrScenes[iSceneIndex].cursorStyle = GuiTerminal::Control::CursorBarLeft;
+                break;
+            case DemoSceneNested:
+                hr = DemoInitializeNestedScene(lpGuiTerminal, hRegionScene, &hCursorRegion);
+                g_sDemoState.arrScenes[iSceneIndex].cursorStyle = GuiTerminal::Control::CursorBlock;
+                break;
+            case DemoSceneMove:
+                hr = DemoInitializeMoveScene(lpGuiTerminal, hRegionScene, &hCursorRegion);
+                g_sDemoState.arrScenes[iSceneIndex].cursorStyle = GuiTerminal::Control::CursorBarLeft;
+                break;
+            default:
+                hr = E_UNEXPECTED;
+                break;
         }
         if (FAILED(hr))
         {
@@ -212,8 +227,14 @@ static HRESULT InitializeScenes(_In_ GuiTerminal::Control *lpGuiTerminal) noexce
 static VOID SelectScene(_In_ GuiTerminal::Control *lpGuiTerminal, _In_ INT iSceneIndex) noexcept
 {
     GuiTerminal::RegionHandle hRegionCursor;
+    INT iSceneCurrent;
+
     g_sDemoState.iActiveScene = iSceneIndex;
-    lpGuiTerminal->BringRegionToFront(g_sDemoState.arrScenes[iSceneIndex].hRegion);
+    for (iSceneCurrent = 0; iSceneCurrent < DEMO_SCENE_COUNT; iSceneCurrent++)
+    {
+        lpGuiTerminal->SetRegionVisible(g_sDemoState.arrScenes[iSceneCurrent].hRegion,
+                                        (iSceneCurrent == iSceneIndex) ? TRUE : FALSE);
+    }
     DrawButtons(lpGuiTerminal);
     lpGuiTerminal->SetCursorStyle(g_sDemoState.arrScenes[iSceneIndex].cursorStyle);
     hRegionCursor = g_sDemoState.arrScenes[iSceneIndex].hCursorRegion;
@@ -224,15 +245,14 @@ static INT HitTestButton(_In_ INT iCol, _In_ INT iRow) noexcept
 {
     INT iSceneIndex;
     INT iButtonX;
-    if ((iCol < 0) || (iRow < 0))
+    if (iCol < 0 || iRow < 0)
     {
         return -1;
     }
     for (iSceneIndex = 0; iSceneIndex < DEMO_SCENE_COUNT; iSceneIndex++)
     {
         iButtonX = DEMO_BUTTON_X + (iSceneIndex * (DEMO_BUTTON_WIDTH + DEMO_BUTTON_GAP));
-        if ((iCol >= iButtonX) && (iCol < (iButtonX + DEMO_BUTTON_WIDTH)) && (iRow >= DEMO_BUTTON_Y) &&
-            (iRow < (DEMO_BUTTON_Y + DEMO_BUTTON_HEIGHT)))
+        if (iCol >= iButtonX && iCol < iButtonX + DEMO_BUTTON_WIDTH && iRow >= DEMO_BUTTON_Y && iRow < DEMO_BUTTON_Y + DEMO_BUTTON_HEIGHT)
         {
             return iSceneIndex;
         }

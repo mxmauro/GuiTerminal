@@ -7,6 +7,7 @@
 // -----------------------------------------------------------------------------
 
 static VOID DrawCustomChart(_In_ GuiTerminal::DrawContext &drawContext, _In_ GuiTerminal::RegionHandle hRegion) noexcept;
+static GuiTerminal::RegionHandle g_hRegionChart{};
 
 HRESULT DemoInitializeNestedScene(_In_ GuiTerminal::Control *lpGuiTerminal, _In_ GuiTerminal::RegionHandle hRegionScene,
                                   _Out_ GuiTerminal::RegionHandle *lphCursorRegion) noexcept
@@ -61,6 +62,7 @@ HRESULT DemoInitializeNestedScene(_In_ GuiTerminal::Control *lpGuiTerminal, _In_
     {
         return hr;
     }
+    g_hRegionChart = hRegionChart;
     hr = lpGuiTerminal->CreateRegion(28, 6, 26, 4, &hRegionChartLabel, hRegionChart);
     if (FAILED(hr))
     {
@@ -96,6 +98,15 @@ HRESULT DemoInitializeNestedScene(_In_ GuiTerminal::Control *lpGuiTerminal, _In_
                                L"\x1b[10;72H- front child\x1b[11;72H- grandchild badge\x1b[13;72HCustom chart + clipped text child");
     *lphCursorRegion = hRegionBadge;
     return S_OK;
+}
+
+VOID DemoAnimateNestedScene(_In_ GuiTerminal::Control *lpGuiTerminal) noexcept
+{
+    // Keep the animation scoped to the cached custom region rather than the whole control.
+    if (lpGuiTerminal && g_hRegionChart)
+    {
+        lpGuiTerminal->InvalidateRegion(g_hRegionChart);
+    }
 }
 
 // -----------------------------------------------------------------------------

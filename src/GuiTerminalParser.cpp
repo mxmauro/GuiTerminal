@@ -12,6 +12,7 @@ Parser::Parser(_Inout_ Buffer &sBuffer, _In_opt_ RegionHandle hRegion) noexcept 
 
 VOID Parser::Feed(_In_z_ LPCWSTR szTextW) noexcept
 {
+    // Route each codepoint through the current ANSI parser state.
     while (*szTextW != L'\0')
     {
         if (m_sState == State::Ground)
@@ -85,6 +86,7 @@ VOID Parser::HandleCsi(_In_ WCHAR chCodepointW) noexcept
         m_sState = State::Ground;
         return;
     }
+    // Unsupported CSI syntax is discarded as a whole so it cannot leak partial state into later text.
     ResetCsi();
     m_sState = State::Ground;
 }
@@ -94,6 +96,7 @@ VOID Parser::DispatchCsi(_In_ WCHAR chFinalCodepointW) noexcept
     INT iFirst;
     INT iSecond;
 
+    // CSI cursor commands treat omitted and zero parameters as one.
     iFirst = 1;
     iSecond = 1;
     if (m_cParams > 0)
@@ -107,49 +110,49 @@ VOID Parser::DispatchCsi(_In_ WCHAR chFinalCodepointW) noexcept
 
     switch (chFinalCodepointW)
     {
-    case L'A':
-        m_sBuffer.MoveCursorRelative(m_hRegion, 0, -iFirst);
-        break;
-    case L'B':
-        m_sBuffer.MoveCursorRelative(m_hRegion, 0, iFirst);
-        break;
-    case L'C':
-        m_sBuffer.MoveCursorRelative(m_hRegion, iFirst, 0);
-        break;
-    case L'D':
-        m_sBuffer.MoveCursorRelative(m_hRegion, -iFirst, 0);
-        break;
-    case L'G':
-        m_sBuffer.SetCursorColumn(m_hRegion, iFirst);
-        break;
-    case L'd':
-        m_sBuffer.SetCursorRow(m_hRegion, iFirst);
-        break;
-    case L'H':
-    case L'f':
-        m_sBuffer.SetCursorPosition(m_hRegion, iFirst, iSecond);
-        break;
-    case L'J':
-        m_sBuffer.EraseInDisplay(m_hRegion, (m_cParams > 0) ? m_iParams[0] : 0);
-        break;
-    case L'K':
-        m_sBuffer.EraseInLine(m_hRegion, (m_cParams > 0) ? m_iParams[0] : 0);
-        break;
-    case L'm':
-        m_sBuffer.SetGraphicsRendition(m_hRegion, m_iParams, m_cParams);
-        break;
-    case L'S':
-        m_sBuffer.Scroll(m_hRegion, iFirst);
-        break;
-    case L'T':
-        m_sBuffer.Scroll(m_hRegion, -iFirst);
-        break;
-    case L's':
-        m_sBuffer.SaveCursor(m_hRegion);
-        break;
-    case L'u':
-        m_sBuffer.RestoreCursor(m_hRegion);
-        break;
+        case L'A':
+            m_sBuffer.MoveCursorRelative(m_hRegion, 0, -iFirst);
+            break;
+        case L'B':
+            m_sBuffer.MoveCursorRelative(m_hRegion, 0, iFirst);
+            break;
+        case L'C':
+            m_sBuffer.MoveCursorRelative(m_hRegion, iFirst, 0);
+            break;
+        case L'D':
+            m_sBuffer.MoveCursorRelative(m_hRegion, -iFirst, 0);
+            break;
+        case L'G':
+            m_sBuffer.SetCursorColumn(m_hRegion, iFirst);
+            break;
+        case L'd':
+            m_sBuffer.SetCursorRow(m_hRegion, iFirst);
+            break;
+        case L'H':
+        case L'f':
+            m_sBuffer.SetCursorPosition(m_hRegion, iFirst, iSecond);
+            break;
+        case L'J':
+            m_sBuffer.EraseInDisplay(m_hRegion, (m_cParams > 0) ? m_iParams[0] : 0);
+            break;
+        case L'K':
+            m_sBuffer.EraseInLine(m_hRegion, (m_cParams > 0) ? m_iParams[0] : 0);
+            break;
+        case L'm':
+            m_sBuffer.SetGraphicsRendition(m_hRegion, m_iParams, m_cParams);
+            break;
+        case L'S':
+            m_sBuffer.Scroll(m_hRegion, iFirst);
+            break;
+        case L'T':
+            m_sBuffer.Scroll(m_hRegion, -iFirst);
+            break;
+        case L's':
+            m_sBuffer.SaveCursor(m_hRegion);
+            break;
+        case L'u':
+            m_sBuffer.RestoreCursor(m_hRegion);
+            break;
     }
     ResetCsi();
 }
@@ -178,5 +181,5 @@ VOID Parser::ResetCsi() noexcept
 
 static BOOL IsC0Control(_In_ WCHAR chCodepointW) noexcept
 {
-    return ((chCodepointW < 0x20U) || (chCodepointW == 0x7FU)) ? TRUE : FALSE;
+    return (chCodepointW < 0x20U || chCodepointW == 0x7FU) ? TRUE : FALSE;
 }

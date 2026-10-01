@@ -9,7 +9,7 @@
 #define WINDOW_CLASS_NAME L"SampleGuiTerminalWindow"
 #define WINDOW_TITLE L"Sample GuiTerminal"
 #define ANIMATION_TIMER_ID 1U
-#define ANIMATION_TIMER_INTERVAL 10U
+#define ANIMATION_TIMER_INTERVAL 16U
 
 // -----------------------------------------------------------------------------
 
@@ -48,8 +48,8 @@ INT APIENTRY wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE hPrevInstance
     {
         return static_cast<INT>(HRESULT_FROM_WIN32(GetLastError()));
     }
-    hWnd = CreateWindowExW(0, WINDOW_CLASS_NAME, WINDOW_TITLE, WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT, 1280, 720, nullptr,
-                           nullptr, hInstance, nullptr);
+    hWnd = CreateWindowExW(WS_EX_NOREDIRECTIONBITMAP, WINDOW_CLASS_NAME, WINDOW_TITLE, WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT,
+                           1280, 720, nullptr, nullptr, hInstance, nullptr);
     if (!hWnd)
     {
         return static_cast<INT>(HRESULT_FROM_WIN32(GetLastError()));
@@ -72,7 +72,7 @@ static HRESULT EnablePerMonitorDpiAwareness() noexcept
     if (SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2) == FALSE)
     {
         hr = HRESULT_FROM_WIN32(GetLastError());
-        if ((hr == HRESULT_FROM_WIN32(ERROR_ACCESS_DENIED)) || (hr == E_ACCESSDENIED))
+        if (hr == HRESULT_FROM_WIN32(ERROR_ACCESS_DENIED) || hr == E_ACCESSDENIED)
         {
             hr = S_OK;
         }
@@ -83,36 +83,38 @@ static HRESULT EnablePerMonitorDpiAwareness() noexcept
 static LRESULT CALLBACK MainWndProc(_In_ HWND hWnd, _In_ UINT uMessage, _In_ WPARAM wParam, _In_ LPARAM lParam) noexcept
 {
     LRESULT lResult;
+
     if (GuiTerminal::Control::WndProc(hWnd, uMessage, wParam, lParam, &lResult) != FALSE)
     {
         return lResult;
     }
     switch (uMessage)
     {
-    case WM_CREATE:
-        return HandleCreate(hWnd);
-    case WM_TIMER:
-        if (wParam == ANIMATION_TIMER_ID)
-        {
-            InvalidateRect(hWnd, nullptr, FALSE);
-        }
-        return 0;
-    case WM_LBUTTONDOWN:
-        return HandleMouseButton(hWnd, TRUE, TRUE, L"Left", L"Down", GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
-    case WM_LBUTTONUP:
-        return HandleMouseButton(hWnd, TRUE, FALSE, L"Left", L"Up", GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
-    case WM_RBUTTONDOWN:
-        return HandleMouseButton(hWnd, FALSE, TRUE, L"Right", L"Down", GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
-    case WM_RBUTTONUP:
-        return HandleMouseButton(hWnd, FALSE, FALSE, L"Right", L"Up", GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
-    case WM_MBUTTONDOWN:
-        return HandleMouseButton(hWnd, FALSE, TRUE, L"Middle", L"Down", GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
-    case WM_MBUTTONUP:
-        return HandleMouseButton(hWnd, FALSE, FALSE, L"Middle", L"Up", GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
-    case WM_DESTROY:
-        KillTimer(hWnd, ANIMATION_TIMER_ID);
-        PostQuitMessage(0);
-        return 0;
+        case WM_CREATE:
+            return HandleCreate(hWnd);
+        case WM_TIMER:
+            if (wParam == ANIMATION_TIMER_ID)
+            {
+                // The animation drives terminal invalidation directly instead of requesting WM_PAINT.
+                DemoAnimate(GuiTerminal::Control::GetControl(hWnd));
+            }
+            return 0;
+        case WM_LBUTTONDOWN:
+            return HandleMouseButton(hWnd, TRUE, TRUE, L"Left", L"Down", GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
+        case WM_LBUTTONUP:
+            return HandleMouseButton(hWnd, TRUE, FALSE, L"Left", L"Up", GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
+        case WM_RBUTTONDOWN:
+            return HandleMouseButton(hWnd, FALSE, TRUE, L"Right", L"Down", GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
+        case WM_RBUTTONUP:
+            return HandleMouseButton(hWnd, FALSE, FALSE, L"Right", L"Up", GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
+        case WM_MBUTTONDOWN:
+            return HandleMouseButton(hWnd, FALSE, TRUE, L"Middle", L"Down", GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
+        case WM_MBUTTONUP:
+            return HandleMouseButton(hWnd, FALSE, FALSE, L"Middle", L"Up", GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
+        case WM_DESTROY:
+            KillTimer(hWnd, ANIMATION_TIMER_ID);
+            PostQuitMessage(0);
+            return 0;
     }
     return DefWindowProcW(hWnd, uMessage, wParam, lParam);
 }

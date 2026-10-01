@@ -104,7 +104,7 @@ max_line_length = 140
 cpp_generate_documentation_comments = xml
 
 # Visual C++ does not expose an EditorConfig setting that inserts braces around
-# single-statement control-flow bodies. AGENTS.md remains authoritative for that rule.
+# single-statement control-flow bodies. windows-cpp-style remains authoritative for that rule.
 
 # Visual C++ Formatting settings
 

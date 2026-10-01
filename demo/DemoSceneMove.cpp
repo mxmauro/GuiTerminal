@@ -34,6 +34,7 @@ HRESULT DemoInitializeMoveScene(_In_ GuiTerminal::Control *lpGuiTerminal, _In_ G
                               GuiTerminal::Control::StyleNone);
     lpGuiTerminal->WriteRegion(hRegionScene, L"\x1b[5;127HCLIP RIGHT");
     lpGuiTerminal->WriteRegion(hRegionScene, L"\x1b[6;126Hsource >>>>>>>>");
+    // Move beyond the right edge to exercise source and destination clipping.
     lpGuiTerminal->MoveRegion(hRegionScene, 124, 4, 24, 3, 144, 5, L'!', RGB(255U, 210U, 160U), RGB(52U, 18U, 72U),
                               GuiTerminal::Control::StyleBold);
     lpGuiTerminal->FillRegion(hRegionScene, 4, 12, 20, 2, L'%', RGB(255U, 245U, 200U), RGB(94U, 38U, 120U),

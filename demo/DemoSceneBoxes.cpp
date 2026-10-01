@@ -27,6 +27,7 @@ HRESULT DemoInitializeBoxesScene(_In_ GuiTerminal::Control *lpGuiTerminal, _In_ 
     lpGuiTerminal->DrawRegionBox(hRegionScene, 18, 6, 36, 7,
                                  GuiTerminal::Control::BoxSideRightDouble | GuiTerminal::Control::BoxSideBottomDouble,
                                  RGB(255U, 240U, 200U), RGB(90U, 58U, 0U), GuiTerminal::Control::StyleNone);
+    // Cross strokes and shades to exercise box-glyph merging at shared cells.
     lpGuiTerminal->DrawRegionHorizontalLine(hRegionScene, 8, 8, 70, GuiTerminal::Control::StrokeSingleLine, RGB(255U, 230U, 170U),
                                             RGB(48U, 34U, 0U), GuiTerminal::Control::StyleNone);
     lpGuiTerminal->DrawRegionVerticalLine(hRegionScene, 28, 3, 11, GuiTerminal::Control::StrokeDoubleLine, RGB(255U, 245U, 200U),

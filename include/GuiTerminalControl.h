@@ -3,6 +3,7 @@
 #include "GuiTerminalBuffer.h"
 #include "GuiTerminalRenderer.h"
 #include <cstdarg>
+#include <atomic>
 #include <functional>
 #include <mutex>
 #include <thread>
@@ -24,8 +25,7 @@ using CustomDrawResourceCleanupCallback = std::function<VOID(_In_ CustomDrawReso
 class Control
 {
   public:
-    typedef struct Config_s
-    {
+    typedef struct Config_s {
         INT iRows{25};
         INT iCols{80};
         LPCWSTR szFontFamilyW{L"Consolas"};
@@ -34,8 +34,7 @@ class Control
         COLORREF crDefaultBackground{RGB(12U, 12U, 12U)};
     } Config;
 
-    typedef enum StyleFlags_e : DWORD
-    {
+    typedef enum StyleFlags_e : DWORD {
         StyleNone = 0U,
         StyleBold = 1U << 0,
         StyleUnderline = 1U << 1,
@@ -44,8 +43,7 @@ class Control
         StyleItalic = 1U << 4
     } StyleFlags;
 
-    typedef enum StrokeType_e : DWORD
-    {
+    typedef enum StrokeType_e : DWORD {
         StrokeSingleLine = 0U,
         StrokeDoubleLine,
         StrokeShadeLight,
@@ -54,8 +52,7 @@ class Control
         StrokeSolidBlock
     } StrokeType;
 
-    typedef enum BoxSideFlags_e : DWORD
-    {
+    typedef enum BoxSideFlags_e : DWORD {
         BoxSideNone = 0U,
         BoxSideTopDouble = 1U << 0,
         BoxSideRightDouble = 1U << 1,
@@ -63,8 +60,7 @@ class Control
         BoxSideLeftDouble = 1U << 3
     } BoxSideFlags;
 
-    typedef enum CursorStyle_e : DWORD
-    {
+    typedef enum CursorStyle_e : DWORD {
         CursorBlock = 0U,
         CursorUnderscore,
         CursorBarLeft
@@ -151,7 +147,7 @@ class Control
                          _In_opt_ RegionHandle hRegionParent = nullptr) noexcept;
     /**
      * @brief Creates a child region rendered by a custom draw callback.
-     * @param fnDrawCallback Callback invoked during painting; captured state must remain valid while the region exists.
+     * @param fnDrawCallback Callback invoked by the renderer worker; captured state must remain valid while the region exists.
      * @param hRegionParent Optional parent; nullptr selects the root region.
      * @return S_OK on success; otherwise a Win32-style failure code.
      */
@@ -207,6 +203,12 @@ class Control
      * @return S_OK on success; otherwise a Win32-style failure code.
      */
     HRESULT RelocateRegion(_In_ RegionHandle hRegion, _In_ INT iX, _In_ INT iY, _In_ INT iWidth, _In_ INT iHeight) noexcept;
+    /**
+     * @brief Shows or hides a region and its descendant subtree.
+     * @param hRegion Target region; null is not valid.
+     * @param bVisible TRUE to compose and draw the subtree; FALSE to suppress it.
+     */
+    HRESULT SetRegionVisible(_In_ RegionHandle hRegion, _In_ BOOL bVisible) noexcept;
     /** @brief Brings a region in front of its siblings. */
     HRESULT BringRegionToFront(_In_ RegionHandle hRegion) noexcept;
     /** @brief Sends a region behind its siblings. */
@@ -320,8 +322,7 @@ class Control
     BOOL GetCellFromPosition(_In_ INT iX, _In_ INT iY, _Out_opt_ LPINT lpiCol, _Out_opt_ LPINT lpiRow) const noexcept;
 
   private:
-    typedef enum ScrollBarPart_e
-    {
+    typedef enum ScrollBarPart_e {
         ScrollBarPartNone = 0,
         ScrollBarPartVerticalThumb,
         ScrollBarPartHorizontalThumb
@@ -333,6 +334,7 @@ class Control
   private:
     HRESULT Initialize(_In_ HWND hWnd, _In_ const Config &configControl) noexcept;
     HRESULT Present() noexcept;
+    VOID RequestRender() noexcept;
     HRESULT ResizeRenderTarget(_In_ UINT uiWidth, _In_ UINT uiHeight) noexcept;
     VOID UpdateScrollBars() noexcept;
     BOOL HandleMouseMove(_In_ INT iX, _In_ INT iY) noexcept;
@@ -345,12 +347,19 @@ class Control
     HRESULT StartBlinkThread() noexcept;
     VOID StopBlinkThread() noexcept;
     static VOID BlinkThreadEntry(_In_ Control *lpControl) noexcept;
+    HRESULT StartRenderThread() noexcept;
+    VOID StopRenderThread(_In_ BOOL bPumpMessages) noexcept;
+    static VOID StaticRenderThread(_In_ Control *lpControl) noexcept;
+    VOID RenderThread() noexcept;
 
   private:
-    static std::mutex m_mutex;
+    static std::mutex m_mapMutex;
     static std::unordered_map<HWND, Control *> m_mapControls;
+    mutable std::mutex m_mutex;
     HWND m_hWnd{};
     HANDLE m_hBlinkStopEvent{};
+    HANDLE m_hRenderStopEvent{};
+    HANDLE m_hRenderRequestEvent{};
     INT m_iCols{};
     INT m_iRows{};
     BOOL m_bTrackingMouse{FALSE};
@@ -361,6 +370,9 @@ class Control
     INT m_iScrollOffsetOriginX{};
     INT m_iScrollOffsetOriginY{};
     std::thread m_threadBlink;
+    std::thread m_threadRender;
+    std::atomic<BOOL> m_bRenderRequested{FALSE};
+    std::atomic<BOOL> m_bShuttingDown{FALSE};
     Internals::Buffer m_sBuffer;
     Internals::Renderer m_sRenderer;
 };

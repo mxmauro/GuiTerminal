@@ -29,6 +29,7 @@ HRESULT GuiTerminalControl_Create(_In_ HWND hWnd, _In_ const GuiTerminalControlC
         return E_POINTER;
     }
 
+    // Translate the C configuration and return the C++ object through an opaque C handle.
     lpCreatedControl = nullptr;
     const GuiTerminal::Control::Config sCppConfig = ToCppConfig(*lpConfig);
     hr = GuiTerminal::Control::Create(hWnd, sCppConfig, &lpCreatedControl);
@@ -212,6 +213,7 @@ HRESULT GuiTerminalControl_CreateCustomDrawRegion(_In_ GuiTerminalControl *lpCon
     }
     try
     {
+        // Adapt the C callback and its caller-owned state to the C++ renderer callback contract.
         fnDrawCallback = [lpDrawCallback, lpDrawState](_In_ GuiTerminal::DrawContext &drawContext,
                                                        _In_ GuiTerminal::RegionHandle hRegionCallback) noexcept {
             lpDrawCallback(reinterpret_cast<GuiTerminalDrawContext *>(&drawContext), ToCRegion(hRegionCallback), lpDrawState);
@@ -361,6 +363,15 @@ HRESULT GuiTerminalControl_RelocateRegion(_In_ GuiTerminalControl *lpControl, _I
         return E_POINTER;
     }
     return ToCppControl(lpControl)->RelocateRegion(ToCppRegion(hRegion), iX, iY, iWidth, iHeight);
+}
+
+HRESULT GuiTerminalControl_SetRegionVisible(_In_ GuiTerminalControl *lpControl, _In_ GuiTerminalRegion hRegion, _In_ BOOL bVisible)
+{
+    if (!lpControl)
+    {
+        return E_POINTER;
+    }
+    return ToCppControl(lpControl)->SetRegionVisible(ToCppRegion(hRegion), bVisible);
 }
 
 HRESULT GuiTerminalControl_BringRegionToFront(_In_ GuiTerminalControl *lpControl, _In_ GuiTerminalRegion hRegion)

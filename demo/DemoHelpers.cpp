@@ -18,6 +18,7 @@ VOID DemoWriteCenteredText(_In_ GuiTerminal::Control *lpGuiTerminal, _In_ INT iC
     }
 
     iTextLength = static_cast<INT>(wcslen(szTextW));
+    // Keep overlong captions anchored to the requested left edge.
     iStartCol = iCol + ((iWidth - iTextLength) / 2);
     if (iStartCol < iCol)
     {

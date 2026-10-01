@@ -1,9 +1,12 @@
 #pragma once
 
 #include "GuiTerminalBuffer.h"
-#include <d2d1.h>
+#include <d2d1_1.h>
+#include <d3d11.h>
 #include <dwrite.h>
+#include <dxgi1_3.h>
 #include <string>
+#include <unordered_map>
 #include <wrl\client.h>
 
 // -----------------------------------------------------------------------------
@@ -18,7 +21,7 @@ class Renderer
     Renderer() noexcept = default;
     Renderer(const Renderer &) = delete;
     Renderer(Renderer &&) = delete;
-    ~Renderer() noexcept = default;
+    ~Renderer() noexcept;
 
     Renderer &operator=(const Renderer &) = delete;
     Renderer &operator=(Renderer &&) = delete;
@@ -26,6 +29,10 @@ class Renderer
     HRESULT Initialize(_In_ HWND hWnd, _In_z_ LPCWSTR szFontFamilyW, _In_ FLOAT fFontSize) noexcept;
     HRESULT Resize(_In_ UINT uiWidth, _In_ UINT uiHeight) noexcept;
     HRESULT Render(_In_ const Buffer &bufferGuiTerminal) noexcept;
+    HRESULT Present() noexcept;
+    HANDLE ConsumeFrameLatencyWaitableObject() noexcept;
+    VOID InvalidateCustomDrawRegion(_In_opt_ RegionHandle hRegion) noexcept;
+    VOID InvalidateComposition() noexcept;
 
     BOOL GetCellPosition(_In_ INT iCol, _In_ INT iRow, _Out_ LPRECT lprcCell) const noexcept;
     HRESULT GetCellSize(_Out_ LPSIZE lpSize) const noexcept;
@@ -77,8 +84,7 @@ class Renderer
     ID2D1RenderTarget *GetRenderTarget() const noexcept;
 
   private:
-    typedef struct FontMetrics_s
-    {
+    typedef struct FontMetrics_s {
         INT iCellWidthPx{};
         INT iCellHeightPx{};
         INT iBaselinePx{};
@@ -88,8 +94,7 @@ class Renderer
         FLOAT fFontSize{12.0f};
     } FontMetrics;
 
-    typedef struct ScrollBarMetrics_s
-    {
+    typedef struct ScrollBarMetrics_s {
         BOOL bVisible{FALSE};
         BOOL bHot{FALSE};
         RECT rcTrack{};
@@ -101,9 +106,29 @@ class Renderer
         INT iMaxOffset{};
     } ScrollBarMetrics;
 
+    typedef struct CellRenderState_s {
+        Buffer::Cell sCell{};
+        BOOL bDirty{};
+        BOOL bHasBlink{};
+    } CellRenderState;
+
+    typedef struct CustomDrawCache_s {
+        Microsoft::WRL::ComPtr<ID2D1Bitmap1> bitmap;
+        UINT uiWidth{};
+        UINT uiHeight{};
+        BOOL bDirty{TRUE};
+    } CustomDrawCache;
+
   private:
     HRESULT CreateDeviceIndependentResources() noexcept;
     HRESULT CreateDeviceResources() noexcept;
+    HRESULT CreateTargetBitmap() noexcept;
+    HRESULT CreateCompositionBitmap() noexcept;
+    HRESULT ResizeDeviceResources() noexcept;
+    VOID DiscardDeviceResources() noexcept;
+    VOID AddDirtyRect(_In_ const RECT &rcDirty) noexcept;
+    HRESULT UpdateCustomDrawCache(_In_ const Buffer::RenderItem &sRenderItem) noexcept;
+    VOID PruneCustomDrawCaches(_In_ const std::vector<INT> &vecCustomDrawRegionIds) noexcept;
     HRESULT CreateTextFormatAndMetrics() noexcept;
     FLOAT PixelsToDipsX(_In_ INT iPixels) const noexcept;
     FLOAT PixelsToDipsY(_In_ INT iPixels) const noexcept;
@@ -112,8 +137,10 @@ class Renderer
     VOID UpdateViewportLayout() noexcept;
     VOID UpdateScrollBarMetrics(_Inout_ ScrollBarMetrics &scrollBarMetrics, _In_ BOOL bVertical) noexcept;
     VOID DrawScrollBars(_In_ COLORREF crDefaultBackground) noexcept;
-    VOID DrawCells(_In_ const Buffer::Snapshot &sSnapshotBuffer) noexcept;
-    VOID DrawRegionCells(_In_ const Buffer::RenderItem &sRenderItem, _In_ const Buffer::Snapshot &sSnapshotBuffer) noexcept;
+    VOID ClearScrollBarAreas(_In_ COLORREF crDefaultBackground) noexcept;
+    VOID DrawCells(_In_ const Buffer::Snapshot &sSnapshotBuffer, _In_ const CellRect_t &sRectDirty) noexcept;
+    VOID DrawRegionCells(_In_ const Buffer::RenderItem &sRenderItem, _In_ const Buffer::Snapshot &sSnapshotBuffer,
+                         _In_ const CellRect_t &sRectDirty) noexcept;
     VOID DrawCell(_In_ const Buffer::Cell &sCellCurrent, _In_ INT iCol, _In_ INT iRow,
                   _In_ const Buffer::Snapshot &sSnapshotBuffer) noexcept;
     VOID DrawCursor(_In_ const Buffer::Snapshot &sSnapshotBuffer) noexcept;
@@ -136,16 +163,41 @@ class Renderer
     FontMetrics m_metricsFont;
     ScrollBarMetrics m_scrollBarHorizontal;
     ScrollBarMetrics m_scrollBarVertical;
-    Microsoft::WRL::ComPtr<ID2D1Factory> m_d2dFactory;
+    Microsoft::WRL::ComPtr<ID2D1Factory1> m_d2dFactory;
     Microsoft::WRL::ComPtr<IDWriteFactory> m_dwriteFactory;
-    Microsoft::WRL::ComPtr<ID2D1HwndRenderTarget> m_renderTarget;
+    Microsoft::WRL::ComPtr<ID3D11Device> m_d3dDevice;
+    Microsoft::WRL::ComPtr<ID3D11DeviceContext> m_d3dContext;
+    Microsoft::WRL::ComPtr<IDXGISwapChain2> m_swapChain;
+    Microsoft::WRL::ComPtr<ID2D1Device> m_d2dDevice;
+    Microsoft::WRL::ComPtr<ID2D1DeviceContext> m_renderTarget;
+    Microsoft::WRL::ComPtr<ID2D1Bitmap1> m_targetBitmap;
+    Microsoft::WRL::ComPtr<ID2D1Bitmap1> m_compositionBitmap;
     Microsoft::WRL::ComPtr<ID2D1SolidColorBrush> m_brush;
     Microsoft::WRL::ComPtr<ID2D1PathGeometry> m_pathGeometry;
     Microsoft::WRL::ComPtr<ID2D1GeometrySink> m_pathSink;
     BOOL m_bPathFigureOpen{FALSE};
     BOOL m_bPathClosed{FALSE};
     UINT m_uiDeviceGeneration{};
+    UINT m_uiRenderTargetWidth{};
+    UINT m_uiRenderTargetHeight{};
+    HANDLE m_hFrameLatencyWaitableObject{};
     Microsoft::WRL::ComPtr<IDWriteTextFormat> m_textFormat[4];
+    std::vector<CellRenderState> m_vecCachedCells;
+    std::unordered_map<INT, CustomDrawCache> m_mapCustomDrawCaches;
+    RECT m_rcDirty[3]{};
+    UINT m_uDirtyCount{};
+    INT m_iCachedCols{};
+    INT m_iCachedRows{};
+    BOOL m_bCachedBlinkVisible{};
+    BOOL m_bCachedCursorVisible{};
+    INT m_iCachedCursorCol{};
+    INT m_iCachedCursorRow{};
+    DWORD m_dwCachedCursorStyle{};
+    BOOL m_bCompositionInvalid{TRUE};
+    BOOL m_bScrollBarsDirty{TRUE};
+    BOOL m_bFrameReady{FALSE};
+    BOOL m_bFrameFull{TRUE};
+    BOOL m_bWaitForFrameLatency{FALSE};
 };
 
 } // namespace Internals

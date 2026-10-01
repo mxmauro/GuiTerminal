@@ -18,7 +18,6 @@ typedef struct Cell_s {
     COLORREF crForeground{};
     COLORREF crBackground{};
     DWORD dwStyleFlags{};
-    BOOL bIsDirty{};
 } Cell_t;
 
 typedef struct CursorState_s {
@@ -50,6 +49,7 @@ typedef struct Region_s {
     INT iCursorY{};
     CursorState_t sCursorSaved;
     BOOL bWrapPending{FALSE};
+    BOOL bVisible{TRUE};
     PVOID lpContext{nullptr};
     BOOL bCustomDraw{FALSE};
     std::function<VOID(_In_ DrawContext &drawContext, _In_ RegionHandle hRegion)> fnCustomDrawCallback;
@@ -70,8 +70,7 @@ class Buffer
   public:
     using Cell = Internals::Cell_t;
 
-    typedef struct Snapshot_s
-    {
+    typedef struct Snapshot_s {
         const Cell *lpCells{};
         INT iCols{};
         INT iRows{};
@@ -84,8 +83,7 @@ class Buffer
         COLORREF crDefaultBackground{};
     } Snapshot;
 
-    typedef struct RenderItem_s
-    {
+    typedef struct RenderItem_s {
         const Region_t *lpsRegion{};
         CellRect_t sVisibleRect{};
         LONGLONG llOriginX{};
@@ -144,6 +142,7 @@ class Buffer
     HRESULT DestroyRegion(_In_ RegionHandle hRegion) noexcept;
 
     HRESULT RelocateRegion(_In_ RegionHandle hRegion, _In_ INT iX, _In_ INT iY, _In_ INT iWidth, _In_ INT iHeight) noexcept;
+    HRESULT SetRegionVisible(_In_ RegionHandle hRegion, _In_ BOOL bVisible) noexcept;
     HRESULT BringRegionToFront(_In_ RegionHandle hRegion) noexcept;
     HRESULT SendRegionToBack(_In_ RegionHandle hRegion) noexcept;
     HRESULT MoveRegionAfter(_In_ RegionHandle hRegion, _In_opt_ RegionHandle hRegionReference) noexcept;
@@ -182,6 +181,8 @@ class Buffer
 
     HRESULT GetSnapshot(_Out_ Snapshot *lpSnapshot) const noexcept;
     HRESULT GetRenderPlan(_Out_ std::vector<RenderItem> *lpRenderItems) const noexcept;
+    HRESULT GetCustomDrawRegionIds(_Out_ std::vector<INT> *lpRegionIds) const noexcept;
+    BOOL IsCustomDrawRegion(_In_ RegionHandle hRegion) const noexcept;
 
   private:
     HRESULT InitializeRootRegion() noexcept;
@@ -192,6 +193,7 @@ class Buffer
     HRESULT DestroyRegionRecursive(_In_ RegionHandle hRegion) noexcept;
     VOID GetRegionTerminalOrigin(_In_ const Region_t &sRegion, _Out_ LONGLONG &llX, _Out_ LONGLONG &llY) const noexcept;
     VOID GetRegionVisibleTerminalRect(_In_ const Region_t &sRegion, _Out_ CellRect_t &sRectVisible) const noexcept;
+    BOOL IsRegionVisible(_In_ const Region_t &sRegion) const noexcept;
 
     Cell MakeBlankCell() const noexcept;
     HRESULT InitializeRegionCells(_Inout_ Region_t &sRegion) const noexcept;

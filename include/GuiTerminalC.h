@@ -216,6 +216,9 @@ HRESULT GuiTerminalControl_RelocateRegion(_In_ GuiTerminalControl *lpControl, _I
                                           _In_ INT iWidth, _In_ INT iHeight);
 
 GUITERMINAL_CONTROL_API
+HRESULT GuiTerminalControl_SetRegionVisible(_In_ GuiTerminalControl *lpControl, _In_ GuiTerminalRegion hRegion, _In_ BOOL bVisible);
+
+GUITERMINAL_CONTROL_API
 HRESULT GuiTerminalControl_BringRegionToFront(_In_ GuiTerminalControl *lpControl, _In_ GuiTerminalRegion hRegion);
 
 GUITERMINAL_CONTROL_API

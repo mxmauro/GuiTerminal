@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.21)
 
-project(GuiTerminal VERSION 0.8.0 LANGUAGES CXX)
+project(GuiTerminal VERSION 0.9.0 LANGUAGES CXX)
 
 include(CMakePackageConfigHelpers)
 include(GNUInstallDirs)
@@ -73,7 +73,9 @@ endif()
 target_link_libraries(GuiTerminal
     PUBLIC
         d2d1
+        d3d11
         dwrite
+        dxgi
 )
 
 set_target_properties(GuiTerminal PROPERTIES

@@ -11,14 +11,10 @@
 
 namespace GuiTerminal {
 
-std::mutex Control::m_mutex;
+std::mutex Control::m_mapMutex;
 std::unordered_map<HWND, Control *> Control::m_mapControls;
 
 } // namespace GuiTerminal
-
-// -----------------------------------------------------------------------------
-
-static UINT uWindowMessageBlinkRedraw = 0U;
 
 // -----------------------------------------------------------------------------
 
@@ -49,12 +45,6 @@ HRESULT Control::Create(_In_ HWND hWnd, _In_ const Config &configControl, _Out_ 
         return E_INVALIDARG;
     }
 
-    uWindowMessageBlinkRedraw = RegisterWindowMessageW(L"GuiTerminalBlickRedrawMsg");
-    if (uWindowMessageBlinkRedraw == 0U)
-    {
-        return HRESULT_FROM_WIN32(GetLastError());
-    }
-
     lpControl = new (std::nothrow) Control();
     if (!lpControl)
     {
@@ -69,19 +59,32 @@ HRESULT Control::Create(_In_ HWND hWnd, _In_ const Config &configControl, _Out_ 
     }
 
     {
-        std::lock_guard<std::mutex> lockGuard(m_mutex);
+        std::lock_guard<std::mutex> lockGuard(m_mapMutex);
         m_mapControls[hWnd] = lpControl;
     }
 
+    // Publish the HWND mapping before workers start so window messages can safely find this control.
     hr = lpControl->StartBlinkThread();
     if (FAILED(hr))
     {
-        std::lock_guard<std::mutex> lockGuard(m_mutex);
+        std::lock_guard<std::mutex> lockGuard(m_mapMutex);
 
         m_mapControls.erase(hWnd);
         delete lpControl;
         return hr;
     }
+
+    hr = lpControl->StartRenderThread();
+    if (FAILED(hr))
+    {
+        lpControl->StopBlinkThread();
+        std::lock_guard<std::mutex> lockGuard(m_mapMutex);
+
+        m_mapControls.erase(hWnd);
+        delete lpControl;
+        return hr;
+    }
+    lpControl->RequestRender();
 
     *lplpControl = lpControl;
     return S_OK;
@@ -103,125 +106,150 @@ BOOL Control::WndProc(_In_ HWND hWnd, _In_ UINT uMessage, _In_ WPARAM wParam, _I
         return FALSE;
     }
 
-    if (uMessage == uWindowMessageBlinkRedraw)
+    if (lpControl->m_bShuttingDown != FALSE && uMessage != WM_CLOSE && uMessage != WM_DESTROY && uMessage != WM_NCDESTROY)
     {
-        InvalidateRect(hWnd, nullptr, FALSE);
-        return TRUE;
+        if (uMessage == WM_PAINT)
+        {
+            PAINTSTRUCT sPs;
+
+            if (BeginPaint(hWnd, &sPs))
+            {
+                EndPaint(hWnd, &sPs);
+            }
+            return TRUE;
+        }
+        return FALSE;
     }
 
     switch (uMessage)
     {
-    case WM_ERASEBKGND:
-        *lplResult = 1;
-        return TRUE;
-
-    case WM_PAINT: {
-        PAINTSTRUCT sPs;
-
-        if (BeginPaint(hWnd, &sPs))
-        {
-            lpControl->Present();
-            EndPaint(hWnd, &sPs);
-        }
-
-        return TRUE;
-    }
-
-    case WM_SIZE: {
-        RECT rcClient;
-
-        if (GetClientRect(hWnd, &rcClient) != FALSE)
-        {
-            lpControl->ResizeRenderTarget(static_cast<UINT>(rcClient.right - rcClient.left),
-                                          static_cast<UINT>(rcClient.bottom - rcClient.top));
-            InvalidateRect(hWnd, nullptr, FALSE);
-        }
-    }
-    break;
-
-    case WM_DPICHANGED: {
-        LPRECT lprcSuggested;
-
-        lprcSuggested = reinterpret_cast<LPRECT>(lParam);
-        if (lprcSuggested)
-        {
-            SetWindowPos(hWnd, nullptr, lprcSuggested->left, lprcSuggested->top, lprcSuggested->right - lprcSuggested->left,
-                         lprcSuggested->bottom - lprcSuggested->top, SWP_NOZORDER | SWP_NOACTIVATE);
-        }
-        lpControl->RefreshDpi();
-        InvalidateRect(hWnd, nullptr, FALSE);
-    }
-    break;
-
-    case WM_MOUSEMOVE:
-        if (lpControl->HandleMouseMove(GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)) != FALSE)
-        {
-            InvalidateRect(hWnd, nullptr, FALSE);
+        case WM_ERASEBKGND:
+            *lplResult = 1;
             return TRUE;
-        }
-        break;
 
-    case WM_MOUSELEAVE:
-        if (lpControl->HandleMouseLeave() != FALSE)
-        {
-            InvalidateRect(hWnd, nullptr, FALSE);
-            return TRUE;
-        }
-        break;
-
-    case WM_LBUTTONDOWN: {
-        BOOL bBeginCapture;
-        INT iX;
-        INT iY;
-
-        bBeginCapture = FALSE;
-        iX = GET_X_LPARAM(lParam);
-        iY = GET_Y_LPARAM(lParam);
-        if (lpControl->HandleLeftButtonDown(iX, iY, &bBeginCapture) != FALSE)
-        {
-            if (bBeginCapture != FALSE)
+        case WM_PAINT:
             {
-                SetCapture(hWnd);
-            }
-            InvalidateRect(hWnd, nullptr, FALSE);
-            return TRUE;
-        }
-    }
-    break;
+                PAINTSTRUCT sPs;
 
-    case WM_LBUTTONUP:
-        if (lpControl->HandleLeftButtonUp() != FALSE)
-        {
-            if (GetCapture() == hWnd)
+                // Presentation is owned by the render worker; WM_PAINT only validates this window region.
+                if (BeginPaint(hWnd, &sPs))
+                {
+                    EndPaint(hWnd, &sPs);
+                }
+            }
+            return TRUE;
+
+        case WM_SIZE:
             {
-                ReleaseCapture();
+                RECT rcClient;
+
+                if (GetClientRect(hWnd, &rcClient) != FALSE)
+                {
+                    lpControl->ResizeRenderTarget(static_cast<UINT>(rcClient.right - rcClient.left),
+                                                  static_cast<UINT>(rcClient.bottom - rcClient.top));
+                    lpControl->RequestRender();
+                }
             }
-            InvalidateRect(hWnd, nullptr, FALSE);
-            return TRUE;
-        }
-        break;
+            break;
 
-    case WM_MOUSEWHEEL:
-        if (lpControl->HandleMouseWheel(GET_WHEEL_DELTA_WPARAM(wParam)) != FALSE)
-        {
-            InvalidateRect(hWnd, nullptr, FALSE);
-            return TRUE;
-        }
-        break;
+        case WM_DPICHANGED:
+            {
+                LPRECT lprcSuggested;
 
-    case WM_NCDESTROY: {
-        std::lock_guard<std::mutex> lockGuard(m_mutex);
+                lprcSuggested = reinterpret_cast<LPRECT>(lParam);
+                if (lprcSuggested)
+                {
+                    SetWindowPos(hWnd, nullptr, lprcSuggested->left, lprcSuggested->top, lprcSuggested->right - lprcSuggested->left,
+                                 lprcSuggested->bottom - lprcSuggested->top, SWP_NOZORDER | SWP_NOACTIVATE);
+                }
+                lpControl->RefreshDpi();
+                lpControl->RequestRender();
+            }
+            break;
 
-        m_mapControls.erase(hWnd);
-    }
-        lpControl->StopBlinkThread();
-        if (GetCapture() == hWnd)
-        {
-            ReleaseCapture();
-        }
+        case WM_MOUSEMOVE:
+            if (lpControl->HandleMouseMove(GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)) != FALSE)
+            {
+                lpControl->RequestRender();
+                return TRUE;
+            }
+            break;
 
-        delete lpControl;
-        break;
+        case WM_MOUSELEAVE:
+            if (lpControl->HandleMouseLeave() != FALSE)
+            {
+                lpControl->RequestRender();
+                return TRUE;
+            }
+            break;
+
+        case WM_LBUTTONDOWN:
+            {
+                BOOL bBeginCapture;
+                INT iX;
+                INT iY;
+
+                bBeginCapture = FALSE;
+                iX = GET_X_LPARAM(lParam);
+                iY = GET_Y_LPARAM(lParam);
+                if (lpControl->HandleLeftButtonDown(iX, iY, &bBeginCapture) != FALSE)
+                {
+                    if (bBeginCapture != FALSE)
+                    {
+                        SetCapture(hWnd);
+                    }
+                    lpControl->RequestRender();
+                    return TRUE;
+                }
+            }
+            break;
+
+        case WM_LBUTTONUP:
+            if (lpControl->HandleLeftButtonUp() != FALSE)
+            {
+                if (GetCapture() == hWnd)
+                {
+                    ReleaseCapture();
+                }
+                lpControl->RequestRender();
+                return TRUE;
+            }
+            break;
+
+        case WM_MOUSEWHEEL:
+            if (lpControl->HandleMouseWheel(GET_WHEEL_DELTA_WPARAM(wParam)) != FALSE)
+            {
+                lpControl->RequestRender();
+                return TRUE;
+            }
+            break;
+
+        case WM_CLOSE:
+            lpControl->StopRenderThread(TRUE);
+            break;
+
+        case WM_DESTROY:
+            lpControl->StopRenderThread(TRUE);
+            break;
+
+        case WM_NCDESTROY:
+            {
+                {
+                    std::lock_guard<std::mutex> lockGuard(m_mapMutex);
+
+                    m_mapControls.erase(hWnd);
+                }
+
+                lpControl->StopRenderThread(FALSE);
+                lpControl->StopBlinkThread();
+                if (GetCapture() == hWnd)
+                {
+                    ReleaseCapture();
+                }
+
+                delete lpControl;
+            }
+            break;
     }
 
     return FALSE;
@@ -229,7 +257,7 @@ BOOL Control::WndProc(_In_ HWND hWnd, _In_ UINT uMessage, _In_ WPARAM wParam, _I
 
 Control *Control::GetControl(_In_ HWND hWnd)
 {
-    std::lock_guard<std::mutex> lockGuard(m_mutex);
+    std::lock_guard<std::mutex> lockGuard(m_mapMutex);
     std::unordered_map<HWND, Control *>::const_iterator itControl;
 
     itControl = m_mapControls.find(hWnd);
@@ -245,6 +273,7 @@ VOID Control::Clear() noexcept
     std::lock_guard<std::mutex> lockGuard(m_mutex);
 
     m_sBuffer.Clear(nullptr);
+    RequestRender();
 }
 
 VOID Control::Scroll(_In_ INT iLineCount) noexcept
@@ -252,6 +281,8 @@ VOID Control::Scroll(_In_ INT iLineCount) noexcept
     std::lock_guard<std::mutex> lockGuard(m_mutex);
 
     m_sBuffer.Scroll(nullptr, iLineCount);
+    m_sRenderer.InvalidateComposition();
+    RequestRender();
 }
 
 VOID Control::Move(_In_ INT iSourceX, _In_ INT iSourceY, _In_ INT iWidth, _In_ INT iHeight, _In_ INT iTargetX, _In_ INT iTargetY,
@@ -260,6 +291,7 @@ VOID Control::Move(_In_ INT iSourceX, _In_ INT iSourceY, _In_ INT iWidth, _In_ I
     std::lock_guard<std::mutex> lockGuard(m_mutex);
 
     m_sBuffer.Move(nullptr, iSourceX, iSourceY, iWidth, iHeight, iTargetX, iTargetY, chFillW, crForeground, crBackground, dwStyleFlags);
+    RequestRender();
 }
 
 VOID Control::Fill(_In_ INT iX, _In_ INT iY, _In_ INT iWidth, _In_ INT iHeight, _In_ WCHAR chCodepointW, _In_ COLORREF crForeground,
@@ -268,6 +300,7 @@ VOID Control::Fill(_In_ INT iX, _In_ INT iY, _In_ INT iWidth, _In_ INT iHeight, 
     std::lock_guard<std::mutex> lockGuard(m_mutex);
 
     m_sBuffer.Fill(nullptr, iX, iY, iWidth, iHeight, chCodepointW, crForeground, crBackground, dwStyleFlags);
+    RequestRender();
 }
 
 VOID Control::DrawHorizontalLine(_In_ INT iX, _In_ INT iY, _In_ INT iWidth, _In_ StrokeType strokeType, _In_ COLORREF crForeground,
@@ -276,6 +309,7 @@ VOID Control::DrawHorizontalLine(_In_ INT iX, _In_ INT iY, _In_ INT iWidth, _In_
     std::lock_guard<std::mutex> lockGuard(m_mutex);
 
     m_sBuffer.DrawHorizontalLine(nullptr, iX, iY, iWidth, strokeType, crForeground, crBackground, dwStyleFlags);
+    RequestRender();
 }
 
 VOID Control::DrawVerticalLine(_In_ INT iX, _In_ INT iY, _In_ INT iHeight, _In_ StrokeType strokeType, _In_ COLORREF crForeground,
@@ -284,6 +318,7 @@ VOID Control::DrawVerticalLine(_In_ INT iX, _In_ INT iY, _In_ INT iHeight, _In_ 
     std::lock_guard<std::mutex> lockGuard(m_mutex);
 
     m_sBuffer.DrawVerticalLine(nullptr, iX, iY, iHeight, strokeType, crForeground, crBackground, dwStyleFlags);
+    RequestRender();
 }
 
 VOID Control::DrawBox(_In_ INT iX, _In_ INT iY, _In_ INT iWidth, _In_ INT iHeight, _In_ DWORD dwBoxSideFlags, _In_ COLORREF crForeground,
@@ -292,6 +327,7 @@ VOID Control::DrawBox(_In_ INT iX, _In_ INT iY, _In_ INT iWidth, _In_ INT iHeigh
     std::lock_guard<std::mutex> lockGuard(m_mutex);
 
     m_sBuffer.DrawBox(nullptr, iX, iY, iWidth, iHeight, dwBoxSideFlags, crForeground, crBackground, dwStyleFlags);
+    RequestRender();
 }
 
 VOID Control::Write(_In_z_ LPCWSTR szTextW) noexcept
@@ -303,6 +339,7 @@ VOID Control::Write(_In_z_ LPCWSTR szTextW) noexcept
         Internals::Parser m_sParser(m_sBuffer, nullptr);
 
         m_sParser.Feed(szTextW);
+        RequestRender();
     }
 }
 
@@ -332,6 +369,7 @@ VOID Control::PrintV(_In_z_ LPCWSTR szFormatW, _In_ va_list argList) noexcept
             Internals::Parser m_sParser(m_sBuffer, nullptr);
 
             m_sParser.Feed(strTextW.c_str());
+            RequestRender();
         }
     }
 }
@@ -355,7 +393,15 @@ HRESULT Control::CreateRegion(_In_ INT iX, _In_ INT iY, _In_ INT iWidth, _In_ IN
 {
     std::lock_guard<std::mutex> lockGuard(m_mutex);
 
-    return m_sBuffer.CreateRegion(iX, iY, iWidth, iHeight, lphRegion, hRegionParent);
+    HRESULT hr;
+
+    hr = m_sBuffer.CreateRegion(iX, iY, iWidth, iHeight, lphRegion, hRegionParent);
+    if (SUCCEEDED(hr))
+    {
+        m_sRenderer.InvalidateComposition();
+        RequestRender();
+    }
+    return hr;
 }
 
 HRESULT Control::CreateCustomDrawRegion(_In_ INT iX, _In_ INT iY, _In_ INT iWidth, _In_ INT iHeight, _Out_ RegionHandle *lphRegion,
@@ -363,7 +409,15 @@ HRESULT Control::CreateCustomDrawRegion(_In_ INT iX, _In_ INT iY, _In_ INT iWidt
 {
     std::lock_guard<std::mutex> lockGuard(m_mutex);
 
-    return m_sBuffer.CreateCustomDrawRegion(iX, iY, iWidth, iHeight, lphRegion, fnDrawCallback, hRegionParent);
+    HRESULT hr;
+
+    hr = m_sBuffer.CreateCustomDrawRegion(iX, iY, iWidth, iHeight, lphRegion, fnDrawCallback, hRegionParent);
+    if (SUCCEEDED(hr))
+    {
+        m_sRenderer.InvalidateComposition();
+        RequestRender();
+    }
+    return hr;
 }
 
 VOID Control::DestroyRegion(_In_ RegionHandle hRegion) noexcept
@@ -373,6 +427,8 @@ VOID Control::DestroyRegion(_In_ RegionHandle hRegion) noexcept
     if (hRegion)
     {
         m_sBuffer.DestroyRegion(hRegion);
+        m_sRenderer.InvalidateComposition();
+        RequestRender();
     }
 }
 
@@ -381,15 +437,22 @@ VOID Control::ClearRegion(_In_opt_ RegionHandle hRegion) noexcept
     std::lock_guard<std::mutex> lockGuard(m_mutex);
 
     m_sBuffer.Clear(hRegion);
+    RequestRender();
 }
 
 VOID Control::InvalidateRegion(_In_opt_ RegionHandle hRegion) noexcept
 {
-    (void)hRegion;
-    if (m_hWnd)
+    std::lock_guard<std::mutex> lockGuard(m_mutex);
+
+    if (!hRegion || m_sBuffer.IsCustomDrawRegion(hRegion) != FALSE)
     {
-        InvalidateRect(m_hWnd, nullptr, FALSE);
+        m_sRenderer.InvalidateCustomDrawRegion(hRegion);
     }
+    else
+    {
+        m_sRenderer.InvalidateComposition();
+    }
+    RequestRender();
 }
 
 VOID Control::ScrollRegion(_In_opt_ RegionHandle hRegion, _In_ INT iLineCount) noexcept
@@ -397,6 +460,8 @@ VOID Control::ScrollRegion(_In_opt_ RegionHandle hRegion, _In_ INT iLineCount) n
     std::lock_guard<std::mutex> lockGuard(m_mutex);
 
     m_sBuffer.Scroll(hRegion, iLineCount);
+    m_sRenderer.InvalidateComposition();
+    RequestRender();
 }
 
 VOID Control::MoveRegion(_In_opt_ RegionHandle hRegion, _In_ INT iSourceX, _In_ INT iSourceY, _In_ INT iWidth, _In_ INT iHeight,
@@ -406,6 +471,7 @@ VOID Control::MoveRegion(_In_opt_ RegionHandle hRegion, _In_ INT iSourceX, _In_ 
     std::lock_guard<std::mutex> lockGuard(m_mutex);
 
     m_sBuffer.Move(hRegion, iSourceX, iSourceY, iWidth, iHeight, iTargetX, iTargetY, chFillW, crForeground, crBackground, dwStyleFlags);
+    RequestRender();
 }
 
 VOID Control::FillRegion(_In_opt_ RegionHandle hRegion, _In_ INT iX, _In_ INT iY, _In_ INT iWidth, _In_ INT iHeight,
@@ -414,6 +480,7 @@ VOID Control::FillRegion(_In_opt_ RegionHandle hRegion, _In_ INT iX, _In_ INT iY
     std::lock_guard<std::mutex> lockGuard(m_mutex);
 
     m_sBuffer.Fill(hRegion, iX, iY, iWidth, iHeight, chCodepointW, crForeground, crBackground, dwStyleFlags);
+    RequestRender();
 }
 
 VOID Control::DrawRegionHorizontalLine(_In_opt_ RegionHandle hRegion, _In_ INT iX, _In_ INT iY, _In_ INT iWidth, _In_ StrokeType strokeType,
@@ -422,6 +489,7 @@ VOID Control::DrawRegionHorizontalLine(_In_opt_ RegionHandle hRegion, _In_ INT i
     std::lock_guard<std::mutex> lockGuard(m_mutex);
 
     m_sBuffer.DrawHorizontalLine(hRegion, iX, iY, iWidth, strokeType, crForeground, crBackground, dwStyleFlags);
+    RequestRender();
 }
 
 VOID Control::DrawRegionVerticalLine(_In_opt_ RegionHandle hRegion, _In_ INT iX, _In_ INT iY, _In_ INT iHeight, _In_ StrokeType strokeType,
@@ -430,6 +498,7 @@ VOID Control::DrawRegionVerticalLine(_In_opt_ RegionHandle hRegion, _In_ INT iX,
     std::lock_guard<std::mutex> lockGuard(m_mutex);
 
     m_sBuffer.DrawVerticalLine(hRegion, iX, iY, iHeight, strokeType, crForeground, crBackground, dwStyleFlags);
+    RequestRender();
 }
 
 VOID Control::DrawRegionBox(_In_opt_ RegionHandle hRegion, _In_ INT iX, _In_ INT iY, _In_ INT iWidth, _In_ INT iHeight,
@@ -439,6 +508,7 @@ VOID Control::DrawRegionBox(_In_opt_ RegionHandle hRegion, _In_ INT iX, _In_ INT
     std::lock_guard<std::mutex> lockGuard(m_mutex);
 
     m_sBuffer.DrawBox(hRegion, iX, iY, iWidth, iHeight, dwBoxSideFlags, crForeground, crBackground, dwStyleFlags);
+    RequestRender();
 }
 
 VOID Control::WriteRegion(_In_opt_ RegionHandle hRegion, _In_z_ LPCWSTR szTextW) noexcept
@@ -450,6 +520,7 @@ VOID Control::WriteRegion(_In_opt_ RegionHandle hRegion, _In_z_ LPCWSTR szTextW)
         Internals::Parser m_sParser(m_sBuffer, hRegion);
 
         m_sParser.Feed(szTextW);
+        RequestRender();
     }
 }
 
@@ -479,6 +550,7 @@ VOID Control::PrintRegionV(_In_opt_ RegionHandle hRegion, _In_z_ LPCWSTR szForma
             Internals::Parser m_sParser(m_sBuffer, hRegion);
 
             m_sParser.Feed(strTextW.c_str());
+            RequestRender();
         }
     }
 }
@@ -487,28 +559,75 @@ HRESULT Control::RelocateRegion(_In_ RegionHandle hRegion, _In_ INT iX, _In_ INT
 {
     std::lock_guard<std::mutex> lockGuard(m_mutex);
 
-    return m_sBuffer.RelocateRegion(hRegion, iX, iY, iWidth, iHeight);
+    HRESULT hr;
+
+    hr = m_sBuffer.RelocateRegion(hRegion, iX, iY, iWidth, iHeight);
+    if (SUCCEEDED(hr))
+    {
+        m_sRenderer.InvalidateComposition();
+        RequestRender();
+    }
+    return hr;
+}
+
+HRESULT Control::SetRegionVisible(_In_ RegionHandle hRegion, _In_ BOOL bVisible) noexcept
+{
+    std::lock_guard<std::mutex> lockGuard(m_mutex);
+
+    HRESULT hr;
+
+    hr = m_sBuffer.SetRegionVisible(hRegion, bVisible);
+    if (SUCCEEDED(hr))
+    {
+        m_sRenderer.InvalidateComposition();
+        RequestRender();
+    }
+    return hr;
 }
 
 HRESULT Control::BringRegionToFront(_In_ RegionHandle hRegion) noexcept
 {
     std::lock_guard<std::mutex> lockGuard(m_mutex);
 
-    return m_sBuffer.BringRegionToFront(hRegion);
+    HRESULT hr;
+
+    hr = m_sBuffer.BringRegionToFront(hRegion);
+    if (SUCCEEDED(hr))
+    {
+        m_sRenderer.InvalidateComposition();
+        RequestRender();
+    }
+    return hr;
 }
 
 HRESULT Control::SendRegionToBack(_In_ RegionHandle hRegion) noexcept
 {
     std::lock_guard<std::mutex> lockGuard(m_mutex);
 
-    return m_sBuffer.SendRegionToBack(hRegion);
+    HRESULT hr;
+
+    hr = m_sBuffer.SendRegionToBack(hRegion);
+    if (SUCCEEDED(hr))
+    {
+        m_sRenderer.InvalidateComposition();
+        RequestRender();
+    }
+    return hr;
 }
 
 HRESULT Control::MoveRegionAfter(_In_ RegionHandle hRegion, _In_opt_ RegionHandle hRegionReference) noexcept
 {
     std::lock_guard<std::mutex> lockGuard(m_mutex);
 
-    return m_sBuffer.MoveRegionAfter(hRegion, hRegionReference);
+    HRESULT hr;
+
+    hr = m_sBuffer.MoveRegionAfter(hRegion, hRegionReference);
+    if (SUCCEEDED(hr))
+    {
+        m_sRenderer.InvalidateComposition();
+        RequestRender();
+    }
+    return hr;
 }
 
 HRESULT Control::SetRegionContext(_In_opt_ RegionHandle hRegion, _In_opt_ PVOID lpContext) noexcept
@@ -651,6 +770,7 @@ VOID Control::ShowCursor(_In_opt_ RegionHandle hRegion) noexcept
     std::lock_guard<std::mutex> lockGuard(m_mutex);
 
     m_sBuffer.ShowCursor(hRegion);
+    RequestRender();
     InvalidateRect(m_hWnd, nullptr, FALSE);
 }
 
@@ -659,6 +779,7 @@ VOID Control::HideCursor() noexcept
     std::lock_guard<std::mutex> lockGuard(m_mutex);
 
     m_sBuffer.HideCursor();
+    RequestRender();
     InvalidateRect(m_hWnd, nullptr, FALSE);
 }
 
@@ -667,6 +788,7 @@ VOID Control::SetCursorStyle(_In_ CursorStyle style) noexcept
     std::lock_guard<std::mutex> lockGuard(m_mutex);
 
     m_sBuffer.SetCursorStyle(style);
+    RequestRender();
     InvalidateRect(m_hWnd, nullptr, FALSE);
 }
 
@@ -688,7 +810,9 @@ HRESULT Control::ResizeTerminal(_In_ INT iCols, _In_ INT iRows) noexcept
 
     m_iCols = iCols;
     m_iRows = iRows;
+    m_sRenderer.InvalidateComposition();
     UpdateScrollBars();
+    RequestRender();
     return S_OK;
 }
 
@@ -796,9 +920,39 @@ HRESULT Control::Initialize(_In_ HWND hWnd, _In_ const Config &configControl) no
 
 HRESULT Control::Present() noexcept
 {
-    std::lock_guard<std::mutex> lockGuard(m_mutex);
+    HRESULT hr;
 
-    return m_sRenderer.Render(m_sBuffer);
+    {
+        // Keep buffer snapshots and renderer cache updates synchronized with API mutations.
+        std::lock_guard<std::mutex> lockGuard(m_mutex);
+
+        hr = m_sRenderer.Render(m_sBuffer);
+    }
+    if (FAILED(hr))
+    {
+        return hr;
+    }
+    hr = m_sRenderer.Present();
+    if (hr == DXGI_ERROR_DEVICE_REMOVED || hr == DXGI_ERROR_DEVICE_RESET)
+    {
+        std::lock_guard<std::mutex> lockGuard(m_mutex);
+
+        m_sBuffer.NotifyCustomDrawResourceCleanup(CustomDrawResourceCleanupReason::TargetLost);
+    }
+    return hr;
+}
+
+VOID Control::RequestRender() noexcept
+{
+    if (m_bShuttingDown != FALSE || (!m_hRenderRequestEvent))
+    {
+        return;
+    }
+    // Coalesce repeated mutations until the render worker consumes this request.
+    if (m_bRenderRequested.exchange(TRUE) == FALSE)
+    {
+        SetEvent(m_hRenderRequestEvent);
+    }
 }
 
 HRESULT Control::ResizeRenderTarget(_In_ UINT uiWidth, _In_ UINT uiHeight) noexcept
@@ -817,6 +971,7 @@ HRESULT Control::ResizeRenderTarget(_In_ UINT uiWidth, _In_ UINT uiHeight) noexc
         return hr;
     }
     UpdateScrollBars();
+    RequestRender();
     return S_OK;
 }
 
@@ -898,6 +1053,7 @@ BOOL Control::HandleLeftButtonDown(_In_ INT iX, _In_ INT iY, _Out_opt_ PBOOL lpb
     }
     if (bThumb != FALSE)
     {
+        // Retain the pointer and scroll origins so each mouse move can calculate an absolute drag offset.
         m_bDraggingScrollBar = TRUE;
         m_scrollBarPartDragging = (bVertical != FALSE) ? ScrollBarPartVerticalThumb : ScrollBarPartHorizontalThumb;
         m_iScrollDragOriginX = iX;
@@ -937,6 +1093,7 @@ VOID Control::RefreshDpi() noexcept
 
     m_sRenderer.RefreshDpi();
     UpdateScrollBars();
+    RequestRender();
 }
 
 VOID Control::ToggleBlink() noexcept
@@ -944,6 +1101,7 @@ VOID Control::ToggleBlink() noexcept
     std::lock_guard<std::mutex> lockGuard(m_mutex);
 
     m_sBuffer.ToggleBlinkVisibility();
+    RequestRender();
 }
 
 HRESULT Control::StartBlinkThread() noexcept
@@ -1006,6 +1164,7 @@ VOID Control::BlinkThreadEntry(_In_ Control *lpControl) noexcept
 
     for (;;)
     {
+        // Blink changes renderer state without relying on a window paint message.
         dwWaitResult = WaitForSingleObject(lpControl->m_hBlinkStopEvent, 500U);
         if (dwWaitResult != WAIT_TIMEOUT)
         {
@@ -1013,9 +1172,186 @@ VOID Control::BlinkThreadEntry(_In_ Control *lpControl) noexcept
         }
 
         lpControl->ToggleBlink();
-        if (lpControl->m_hWnd)
+        lpControl->RequestRender();
+    }
+}
+
+HRESULT Control::StartRenderThread() noexcept
+{
+    HRESULT hr;
+
+    m_hRenderStopEvent = CreateEventW(nullptr, TRUE, FALSE, nullptr);
+    if (!m_hRenderStopEvent)
+    {
+        return HRESULT_FROM_WIN32(GetLastError());
+    }
+    m_hRenderRequestEvent = CreateEventW(nullptr, FALSE, FALSE, nullptr);
+    if (!m_hRenderRequestEvent)
+    {
+        hr = HRESULT_FROM_WIN32(GetLastError());
+        CloseHandle(m_hRenderStopEvent);
+        m_hRenderStopEvent = nullptr;
+        return hr;
+    }
+    hr = S_OK;
+    try
+    {
+        m_threadRender = std::thread(&Control::StaticRenderThread, this);
+    }
+    catch (const std::bad_alloc &)
+    {
+        hr = E_OUTOFMEMORY;
+    }
+    catch (...)
+    {
+        hr = E_UNEXPECTED;
+    }
+    if (FAILED(hr))
+    {
+        CloseHandle(m_hRenderRequestEvent);
+        CloseHandle(m_hRenderStopEvent);
+        m_hRenderRequestEvent = nullptr;
+        m_hRenderStopEvent = nullptr;
+    }
+    return hr;
+}
+
+VOID Control::StopRenderThread(_In_ BOOL bPumpMessages) noexcept
+{
+    BOOL bQuitReceived;
+    INT iQuitCode;
+
+    if (m_bShuttingDown.exchange(TRUE) != FALSE)
+    {
+        return;
+    }
+    if (m_hRenderStopEvent)
+    {
+        SetEvent(m_hRenderStopEvent);
+    }
+    bQuitReceived = FALSE;
+    iQuitCode = 0;
+    if (m_threadRender.joinable())
+    {
+        if (bPumpMessages != FALSE)
         {
-            PostMessageW(lpControl->m_hWnd, uWindowMessageBlinkRedraw, 0U, 0L);
+            HANDLE hThread;
+
+            // Closing on the UI thread must continue dispatching messages while the render worker drains.
+            hThread = m_threadRender.native_handle();
+            for (;;)
+            {
+                DWORD dwWaitResult;
+
+                dwWaitResult = MsgWaitForMultipleObjectsEx(1U, &hThread, INFINITE, QS_ALLINPUT, MWMO_INPUTAVAILABLE);
+                if (dwWaitResult == WAIT_OBJECT_0)
+                {
+                    break;
+                }
+                if (dwWaitResult == WAIT_OBJECT_0 + 1U)
+                {
+                    MSG msg;
+
+                    while (PeekMessageW(&msg, nullptr, 0U, 0U, PM_REMOVE) != FALSE)
+                    {
+                        if (msg.message == WM_QUIT)
+                        {
+                            bQuitReceived = TRUE;
+                            iQuitCode = static_cast<INT>(msg.wParam);
+                            continue;
+                        }
+                        TranslateMessage(&msg);
+                        DispatchMessageW(&msg);
+                    }
+                    continue;
+                }
+                break;
+            }
+        }
+        m_threadRender.join();
+    }
+    if (m_hRenderRequestEvent)
+    {
+        CloseHandle(m_hRenderRequestEvent);
+        m_hRenderRequestEvent = nullptr;
+    }
+    if (m_hRenderStopEvent)
+    {
+        CloseHandle(m_hRenderStopEvent);
+        m_hRenderStopEvent = nullptr;
+    }
+    if (bQuitReceived != FALSE)
+    {
+        PostQuitMessage(iQuitCode);
+    }
+}
+
+VOID Control::StaticRenderThread(_In_ Control *lpControl) noexcept
+{
+    _ASSERT(lpControl);
+    _ASSERT(lpControl->m_hRenderStopEvent);
+    _ASSERT(lpControl->m_hRenderRequestEvent);
+    lpControl->RenderThread();
+}
+
+VOID Control::RenderThread() noexcept
+{
+    HANDLE aWaitHandles[2];
+    DWORD dwWaitResult;
+    HRESULT hr;
+
+    for (;;)
+    {
+        aWaitHandles[0] = m_hRenderStopEvent;
+        aWaitHandles[1] = m_hRenderRequestEvent;
+        dwWaitResult = WaitForMultipleObjects(2U, aWaitHandles, FALSE, INFINITE);
+        if (dwWaitResult == WAIT_OBJECT_0)
+        {
+            break;
+        }
+        if (dwWaitResult != WAIT_OBJECT_0 + 1U)
+        {
+            break;
+        }
+        m_bRenderRequested.exchange(FALSE);
+        for (;;)
+        {
+            HANDLE hFrameLatency;
+
+            {
+                // Avoid issuing a new frame until DXGI can accept it without queueing latency.
+                std::lock_guard<std::mutex> lockGuard(m_mutex);
+
+                hFrameLatency = m_sRenderer.ConsumeFrameLatencyWaitableObject();
+            }
+            if (hFrameLatency)
+            {
+                aWaitHandles[0] = m_hRenderStopEvent;
+                aWaitHandles[1] = hFrameLatency;
+                dwWaitResult = WaitForMultipleObjects(2U, aWaitHandles, FALSE, INFINITE);
+                if (dwWaitResult == WAIT_OBJECT_0)
+                {
+                    return;
+                }
+                if (dwWaitResult != WAIT_OBJECT_0 + 1U)
+                {
+                    return;
+                }
+            }
+            if (m_bShuttingDown != FALSE)
+            {
+                return;
+            }
+
+            hr = Present();
+            if (FAILED(hr))
+            {
+                RequestRender();
+            }
+            if (!m_bRenderRequested.exchange(FALSE))
+            {
+                break;
+            }
         }
     }
 }

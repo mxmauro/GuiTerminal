@@ -17,8 +17,7 @@ class Renderer;
 
 typedef Internals::Region_t *RegionHandle;
 
-typedef enum class CustomDrawResourceCleanupReason_e : DWORD
-{
+typedef enum class CustomDrawResourceCleanupReason_e : DWORD {
     TargetLost = 0U,
     RegionDestroyed
 } CustomDrawResourceCleanupReason;
@@ -31,8 +30,7 @@ typedef enum class CustomDrawResourceCleanupReason_e : DWORD
 class DrawContext
 {
   public:
-    typedef enum TextAlignment_e : DWORD
-    {
+    typedef enum TextAlignment_e : DWORD {
         AlignLeft = 0U,
         AlignCenter = 1U << 0,
         AlignRight = 2U << 0,
@@ -120,7 +118,7 @@ class DrawContext
 
     /**
      * @brief Returns the underlying Direct2D render target for advanced drawing.
-     * @return The render target valid only for the duration of the custom draw callback.
+     * @return The render target valid only on the renderer worker for the duration of the custom draw callback.
      */
     ID2D1RenderTarget *GetDirect2DRenderTarget() const noexcept;
 

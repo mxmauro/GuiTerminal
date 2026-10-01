@@ -8,5 +8,6 @@ HRESULT DemoInitializeBoxesScene(_In_ GuiTerminal::Control *lpGuiTerminal, _In_ 
                                  _Out_ GuiTerminal::RegionHandle *lphCursorRegion) noexcept;
 HRESULT DemoInitializeNestedScene(_In_ GuiTerminal::Control *lpGuiTerminal, _In_ GuiTerminal::RegionHandle hRegionScene,
                                   _Out_ GuiTerminal::RegionHandle *lphCursorRegion) noexcept;
+VOID DemoAnimateNestedScene(_In_ GuiTerminal::Control *lpGuiTerminal) noexcept;
 HRESULT DemoInitializeMoveScene(_In_ GuiTerminal::Control *lpGuiTerminal, _In_ GuiTerminal::RegionHandle hRegionScene,
                                 _Out_ GuiTerminal::RegionHandle *lphCursorRegion) noexcept;

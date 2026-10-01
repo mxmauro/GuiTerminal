@@ -22,8 +22,7 @@ class Parser
     VOID Feed(_In_z_ LPCWSTR szTextW) noexcept;
 
   private:
-    typedef enum class State_e
-    {
+    typedef enum class State_e {
         Ground,
         Escape,
         Csi

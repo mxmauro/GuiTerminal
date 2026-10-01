@@ -29,15 +29,16 @@ edit scope guidance, or validation commands.
 
 ## Working Rules
 
-- Keep the Win32-native design. Prefer `HRESULT`, `BOOL`, SAL, wide APIs, and the existing naming style.
+- Keep the Win32-native design. Continue using its established `HRESULT`, `BOOL`, SAL, wide-character API, and error-handling conventions.
+- Keep project-owned structs and enums in their established typedef `_s` and `_e` forms. Do not indent declarations or definitions within `extern "C"` blocks.
+- Preserve the established local/project, platform, and standard-library include ordering. Keep internal implementation includes in their current relative Windows-path form.
+- Keep classic fixed-size arrays for file-local lookup tables.
+- Preserve public type names and all established C++ and C API names.
 - Preserve the public/internal split: public interfaces in `include/`, implementation in `src/`.
 - When you change a public operation in C++, check whether the C wrapper and demo should change too.
 - When you change the exported C API, update `include/GuiTerminalC.h`, `src/GuiTerminalC.cpp`, and `GuiTerminal.def` together.
 - Treat the demo as a real consumer. If behavior changes materially, update or extend it.
-- Use `apply_patch` for edits, keep CRLF, and run `utils/fixeol.bat` on touched files before finishing.
-- Keep lines within the repo's 140-character limit and pack wrapped signatures/calls efficiently instead of using one-argument-per-line formatting by default.
-- Align multiline declarations and expressions to the outer opening parenthesis, keep exactly one blank line between function definitions, and use project typedef struct/enum forms.
-- Use classic fixed-size arrays for file-local lookup tables and comment namespace or `extern "C"` closing braces with the scope name.
+- Keep CMake commands lowercase, use four-space indentation, and group long argument lists one item per line. Do not change target names, install layout, or MSVC-specific options unless required.
 
 ## Change Map
 

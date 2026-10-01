@@ -65,6 +65,7 @@ HRESULT Buffer::Resize(_In_ INT iCols, _In_ INT iRows) noexcept
         return E_UNEXPECTED;
     }
 
+    // Allocate replacement storage before committing the new terminal dimensions.
     hr = ResizeRegionCells(*lpsRegionRoot, vecCellsRoot, iCols, iRows);
     if (FAILED(hr))
     {
@@ -187,6 +188,7 @@ VOID Buffer::Move(_In_opt_ RegionHandle hRegion, _In_ INT iSourceX, _In_ INT iSo
     iEndXExclusive = (iStepX > 0) ? (sRectSourceClipped.iX + sRectSourceClipped.iWidth) : (sRectSourceClipped.iX - 1);
     iEndYExclusive = (iStepY > 0) ? (sRectSourceClipped.iY + sRectSourceClipped.iHeight) : (sRectSourceClipped.iY - 1);
 
+    // Traverse away from the destination when source and destination overlap, preserving unread source cells.
     for (iSourceCurrentY = iStartY; iSourceCurrentY != iEndYExclusive; iSourceCurrentY += iStepY)
     {
         for (iSourceCurrentX = iStartX; iSourceCurrentX != iEndXExclusive; iSourceCurrentX += iStepX)
@@ -202,7 +204,6 @@ VOID Buffer::Move(_In_opt_ RegionHandle hRegion, _In_ INT iSourceX, _In_ INT iSo
                 GetCellIndex(iDestinationX, iDestinationY, lpsRegionCurrent->iWidth, &uDestinationIndex) != FALSE)
             {
                 lpsRegionCurrent->vecCells[uDestinationIndex] = lpsRegionCurrent->vecCells[uSourceIndex];
-                lpsRegionCurrent->vecCells[uDestinationIndex].bIsDirty = TRUE;
             }
         }
     }
@@ -394,28 +395,28 @@ VOID Buffer::DrawBox(_In_opt_ RegionHandle hRegion, _In_ INT iX, _In_ INT iY, _I
     if (iWidth == 0)
     {
         DrawVerticalLine(hRegion, iX, iY, iHeight,
-                         ((byLeft == EDGE_SINGLE) && (byRight == EDGE_SINGLE)) ? Control::StrokeSingleLine : Control::StrokeDoubleLine,
+                         (byLeft == EDGE_SINGLE && byRight == EDGE_SINGLE) ? Control::StrokeSingleLine : Control::StrokeDoubleLine,
                          crForeground, crBackground, dwStyleFlags);
         return;
     }
     if (iHeight == 0)
     {
         DrawHorizontalLine(hRegion, iX, iY, iWidth,
-                           ((byTop == EDGE_SINGLE) && (byBottom == EDGE_SINGLE)) ? Control::StrokeSingleLine : Control::StrokeDoubleLine,
+                           (byTop == EDGE_SINGLE && byBottom == EDGE_SINGLE) ? Control::StrokeSingleLine : Control::StrokeDoubleLine,
                            crForeground, crBackground, dwStyleFlags);
         return;
     }
     if (iWidth == 1)
     {
         DrawVerticalLine(hRegion, iX, iY, iHeight,
-                         ((byLeft == EDGE_SINGLE) && (byRight == EDGE_SINGLE)) ? Control::StrokeSingleLine : Control::StrokeDoubleLine,
+                         (byLeft == EDGE_SINGLE && byRight == EDGE_SINGLE) ? Control::StrokeSingleLine : Control::StrokeDoubleLine,
                          crForeground, crBackground, dwStyleFlags);
         return;
     }
     if (iHeight == 1)
     {
         DrawHorizontalLine(hRegion, iX, iY, iWidth,
-                           ((byTop == EDGE_SINGLE) && (byBottom == EDGE_SINGLE)) ? Control::StrokeSingleLine : Control::StrokeDoubleLine,
+                           (byTop == EDGE_SINGLE && byBottom == EDGE_SINGLE) ? Control::StrokeSingleLine : Control::StrokeDoubleLine,
                            crForeground, crBackground, dwStyleFlags);
         return;
     }
@@ -496,33 +497,33 @@ VOID Buffer::ProcessControl(_In_opt_ RegionHandle hRegion, _In_ WCHAR chCodepoin
 
     switch (chCodepointW)
     {
-    case L'\r':
-        lpsRegionCurrent->iCursorX = 0;
-        lpsRegionCurrent->bWrapPending = FALSE;
-        break;
+        case L'\r':
+            lpsRegionCurrent->iCursorX = 0;
+            lpsRegionCurrent->bWrapPending = FALSE;
+            break;
 
-    case L'\n':
-        lpsRegionCurrent->iCursorY += 1;
-        if (lpsRegionCurrent->iCursorY >= lpsRegionCurrent->iHeight)
-        {
-            ScrollRegionUp(lpsRegionCurrent, 1);
-            lpsRegionCurrent->iCursorY = lpsRegionCurrent->iHeight - 1;
-        }
-        lpsRegionCurrent->bWrapPending = FALSE;
-        break;
+        case L'\n':
+            lpsRegionCurrent->iCursorY += 1;
+            if (lpsRegionCurrent->iCursorY >= lpsRegionCurrent->iHeight)
+            {
+                ScrollRegionUp(lpsRegionCurrent, 1);
+                lpsRegionCurrent->iCursorY = lpsRegionCurrent->iHeight - 1;
+            }
+            lpsRegionCurrent->bWrapPending = FALSE;
+            break;
 
-    case L'\b':
-        lpsRegionCurrent->iCursorX = (std::max)(0, lpsRegionCurrent->iCursorX - 1);
-        lpsRegionCurrent->bWrapPending = FALSE;
-        break;
+        case L'\b':
+            lpsRegionCurrent->iCursorX = (std::max)(0, lpsRegionCurrent->iCursorX - 1);
+            lpsRegionCurrent->bWrapPending = FALSE;
+            break;
 
-    case L'\t':
-        AdvanceToNextTabStop(lpsRegionCurrent);
-        break;
+        case L'\t':
+            AdvanceToNextTabStop(lpsRegionCurrent);
+            break;
 
-    case L'\f':
-        Clear(lpsRegionCurrent);
-        break;
+        case L'\f':
+            Clear(lpsRegionCurrent);
+            break;
     }
 }
 
@@ -649,11 +650,11 @@ VOID Buffer::EraseInDisplay(_In_opt_ RegionHandle hRegion, _In_ INT iMode) noexc
     {
         iXStart = 0;
         iXEnd = lpsRegionCurrent->iWidth - 1;
-        if ((iMode == 0) && (iY == lpsRegionCurrent->iCursorY))
+        if (iMode == 0 && iY == lpsRegionCurrent->iCursorY)
         {
             iXStart = lpsRegionCurrent->iCursorX;
         }
-        if ((iMode == 1) && (iY == lpsRegionCurrent->iCursorY))
+        if (iMode == 1 && iY == lpsRegionCurrent->iCursorY)
         {
             iXEnd = lpsRegionCurrent->iCursorX;
         }
@@ -730,19 +731,19 @@ VOID Buffer::SetGraphicsRendition(_In_opt_ RegionHandle hRegion, _In_reads_(uPar
         {
             lpsRegionCurrent->sAttributesCurrent.dwStyleFlags &= ~Control::StyleInverse;
         }
-        else if ((iValue >= 30) && (iValue <= 37))
+        else if (iValue >= 30 && iValue <= 37)
         {
             lpsRegionCurrent->sAttributesCurrent.crForeground = GetAnsi16Color(iValue - 30);
         }
-        else if ((iValue >= 40) && (iValue <= 47))
+        else if (iValue >= 40 && iValue <= 47)
         {
             lpsRegionCurrent->sAttributesCurrent.crBackground = GetAnsi16Color(iValue - 40);
         }
-        else if ((iValue >= 90) && (iValue <= 97))
+        else if (iValue >= 90 && iValue <= 97)
         {
             lpsRegionCurrent->sAttributesCurrent.crForeground = GetAnsi16Color((iValue - 90) + 8);
         }
-        else if ((iValue >= 100) && (iValue <= 107))
+        else if (iValue >= 100 && iValue <= 107)
         {
             lpsRegionCurrent->sAttributesCurrent.crBackground = GetAnsi16Color((iValue - 100) + 8);
         }
@@ -754,7 +755,7 @@ VOID Buffer::SetGraphicsRendition(_In_opt_ RegionHandle hRegion, _In_reads_(uPar
         {
             lpsRegionCurrent->sAttributesCurrent.crBackground = m_sAttributesDefault.crBackground;
         }
-        else if ((iValue == 38) || (iValue == 48))
+        else if (iValue == 38 || iValue == 48)
         {
             ApplySgrColor(lpsRegionCurrent, lpiParams, uParamsCount, &uIndex, (iValue == 38) ? TRUE : FALSE);
         }
@@ -853,6 +854,7 @@ HRESULT Buffer::CreateCustomDrawRegion(_In_ INT iX, _In_ INT iY, _In_ INT iWidth
         return E_UNEXPECTED;
     }
     (*lphRegion)->bCustomDraw = TRUE;
+    // Custom regions supply pixels through the renderer callback and do not own terminal cells.
     (*lphRegion)->vecCells.clear();
     return S_OK;
 }
@@ -917,6 +919,24 @@ HRESULT Buffer::RelocateRegion(_In_ RegionHandle hRegion, _In_ INT iX, _In_ INT 
     return S_OK;
 }
 
+HRESULT Buffer::SetRegionVisible(_In_ RegionHandle hRegion, _In_ BOOL bVisible) noexcept
+{
+    Region_t *lpsRegionCurrent;
+
+    if (!hRegion)
+    {
+        return E_POINTER;
+    }
+    lpsRegionCurrent = ResolveRegion(hRegion);
+    if ((!lpsRegionCurrent) || lpsRegionCurrent->iId == 0)
+    {
+        return E_INVALIDARG;
+    }
+
+    lpsRegionCurrent->bVisible = (bVisible != FALSE) ? TRUE : FALSE;
+    return S_OK;
+}
+
 HRESULT Buffer::BringRegionToFront(_In_ RegionHandle hRegion) noexcept
 {
     Region_t *lpsRegionCurrent;
@@ -947,7 +967,7 @@ HRESULT Buffer::BringRegionToFront(_In_ RegionHandle hRegion) noexcept
     {
         return E_UNEXPECTED;
     }
-    if ((itOrder + 1) == lpsRegionParent->vecChildRegionIds.end())
+    if (itOrder + 1 == lpsRegionParent->vecChildRegionIds.end())
     {
         return S_OK;
     }
@@ -1133,7 +1153,7 @@ HRESULT Buffer::SetCustomDrawRegionResourceCleanup(_In_ RegionHandle hRegion,
     Region_t *lpsRegion;
 
     lpsRegion = ResolveRegion(hRegion);
-    if ((!lpsRegion) || (lpsRegion->bCustomDraw == FALSE))
+    if ((!lpsRegion) || lpsRegion->bCustomDraw == FALSE)
     {
         return E_INVALIDARG;
     }
@@ -1157,7 +1177,7 @@ VOID Buffer::NotifyCustomDrawResourceCleanup(_In_ CustomDrawResourceCleanupReaso
     for (auto &[iRegionId, sRegion] : m_mapRegions)
     {
         (void)iRegionId;
-        if ((sRegion.bCustomDraw != FALSE) && sRegion.fnResourceCleanupCallback)
+        if (sRegion.bCustomDraw != FALSE && sRegion.fnResourceCleanupCallback)
         {
             sRegion.fnResourceCleanupCallback(cleanupReason);
         }
@@ -1376,7 +1396,7 @@ BOOL Buffer::ConvertToRegionCoordinates(_In_ RegionHandle hRegion, _In_ INT iCol
 
     if (!hRegion)
     {
-    zero_and_return_false:
+zero_and_return_false:
         if (lpiColRegion)
         {
             *lpiColRegion = 0;
@@ -1398,8 +1418,8 @@ BOOL Buffer::ConvertToRegionCoordinates(_In_ RegionHandle hRegion, _In_ INT iCol
 
     llColRegion = static_cast<LONGLONG>(iColTerminal) - llColRegion;
     llRowRegion = static_cast<LONGLONG>(iRowTerminal) - llRowRegion;
-    if ((llColRegion < static_cast<LONGLONG>(INT_MIN)) || (llColRegion > static_cast<LONGLONG>(INT_MAX)) ||
-        (llRowRegion < static_cast<LONGLONG>(INT_MIN)) || (llRowRegion > static_cast<LONGLONG>(INT_MAX)))
+    if (llColRegion < static_cast<LONGLONG>(INT_MIN) || llColRegion > static_cast<LONGLONG>(INT_MAX) ||
+        llRowRegion < static_cast<LONGLONG>(INT_MIN) || llRowRegion > static_cast<LONGLONG>(INT_MAX))
     {
         goto zero_and_return_false;
     }
@@ -1426,7 +1446,7 @@ BOOL Buffer::ConvertFromRegionCoordinates(_In_ RegionHandle hRegion, _In_ INT iC
 
     if (!hRegion)
     {
-    zero_and_return_false:
+zero_and_return_false:
         if (lpiColTerminal)
         {
             *lpiColTerminal = 0;
@@ -1452,8 +1472,8 @@ BOOL Buffer::ConvertFromRegionCoordinates(_In_ RegionHandle hRegion, _In_ INT iC
 
     llColTerminal = llOriginX + static_cast<LONGLONG>(iColRegion);
     llRowTerminal = llOriginY + static_cast<LONGLONG>(iRowRegion);
-    if ((llColTerminal < static_cast<LONGLONG>(INT_MIN)) || (llColTerminal > static_cast<LONGLONG>(INT_MAX)) ||
-        (llRowTerminal < static_cast<LONGLONG>(INT_MIN)) || (llRowTerminal > static_cast<LONGLONG>(INT_MAX)))
+    if (llColTerminal < static_cast<LONGLONG>(INT_MIN) || llColTerminal > static_cast<LONGLONG>(INT_MAX) ||
+        llRowTerminal < static_cast<LONGLONG>(INT_MIN) || llRowTerminal > static_cast<LONGLONG>(INT_MAX))
     {
         goto zero_and_return_false;
     }
@@ -1519,11 +1539,11 @@ VOID Buffer::SetCursorStyle(_In_ DWORD dwCursorStyle) noexcept
 {
     switch (dwCursorStyle)
     {
-    case Control::CursorBlock:
-    case Control::CursorUnderscore:
-    case Control::CursorBarLeft:
-        m_dwCursorStyle = dwCursorStyle;
-        break;
+        case Control::CursorBlock:
+        case Control::CursorUnderscore:
+        case Control::CursorBarLeft:
+            m_dwCursorStyle = dwCursorStyle;
+            break;
     }
 }
 
@@ -1558,6 +1578,7 @@ HRESULT Buffer::GetSnapshot(_Out_ Snapshot *lpSnapshot) const noexcept
 
     try
     {
+        // Start from the root, then layer visible normal regions into one renderer-facing snapshot.
         if (m_vecSnapshotCells.size() != static_cast<size_t>(m_iCols) * static_cast<size_t>(m_iRows))
         {
             m_vecSnapshotCells.assign(static_cast<size_t>(m_iCols) * static_cast<size_t>(m_iRows), MakeBlankCell());
@@ -1599,12 +1620,12 @@ HRESULT Buffer::GetSnapshot(_Out_ Snapshot *lpSnapshot) const noexcept
         llCursorRow += static_cast<LONGLONG>(lpsRegionCursor->iCursorY);
 
         GetRegionVisibleTerminalRect(*lpsRegionCursor, sRectVisible);
-        if ((llCursorCol >= static_cast<LONGLONG>(sRectVisible.iX)) &&
-            (llCursorCol < static_cast<LONGLONG>(sRectVisible.iX + sRectVisible.iWidth)) &&
-            (llCursorRow >= static_cast<LONGLONG>(sRectVisible.iY)) &&
-            (llCursorRow < static_cast<LONGLONG>(sRectVisible.iY + sRectVisible.iHeight)) &&
-            (llCursorCol >= static_cast<LONGLONG>(INT_MIN)) && (llCursorCol <= static_cast<LONGLONG>(INT_MAX)) &&
-            (llCursorRow >= static_cast<LONGLONG>(INT_MIN)) && (llCursorRow <= static_cast<LONGLONG>(INT_MAX)))
+        if (llCursorCol >= static_cast<LONGLONG>(sRectVisible.iX) &&
+            llCursorCol < static_cast<LONGLONG>(sRectVisible.iX + sRectVisible.iWidth) &&
+            llCursorRow >= static_cast<LONGLONG>(sRectVisible.iY) &&
+            llCursorRow < static_cast<LONGLONG>(sRectVisible.iY + sRectVisible.iHeight) && llCursorCol >= static_cast<LONGLONG>(INT_MIN) &&
+            llCursorCol <= static_cast<LONGLONG>(INT_MAX) && llCursorRow >= static_cast<LONGLONG>(INT_MIN) &&
+            llCursorRow <= static_cast<LONGLONG>(INT_MAX))
         {
             lpSnapshot->bCursorVisible = TRUE;
             lpSnapshot->iCursorCol = static_cast<INT>(llCursorCol);
@@ -1642,6 +1663,42 @@ HRESULT Buffer::GetRenderPlan(_Out_ std::vector<RenderItem> *lpRenderItems) cons
     {
         return E_UNEXPECTED;
     }
+}
+
+HRESULT Buffer::GetCustomDrawRegionIds(_Out_ std::vector<INT> *lpRegionIds) const noexcept
+{
+    if (!lpRegionIds)
+    {
+        return E_POINTER;
+    }
+    try
+    {
+        lpRegionIds->clear();
+        for (const auto &sRegionPair : m_mapRegions)
+        {
+            if (sRegionPair.second.bCustomDraw != FALSE)
+            {
+                lpRegionIds->push_back(sRegionPair.second.iId);
+            }
+        }
+    }
+    catch (const std::bad_alloc &)
+    {
+        return E_OUTOFMEMORY;
+    }
+    catch (...)
+    {
+        return E_UNEXPECTED;
+    }
+    return S_OK;
+}
+
+BOOL Buffer::IsCustomDrawRegion(_In_ RegionHandle hRegion) const noexcept
+{
+    const Region_t *lpsRegion;
+
+    lpsRegion = ResolveRegion(hRegion);
+    return (lpsRegion && lpsRegion->bCustomDraw != FALSE) ? TRUE : FALSE;
 }
 
 HRESULT Buffer::InitializeRootRegion() noexcept
@@ -1762,6 +1819,7 @@ HRESULT Buffer::DestroyRegionRecursive(_In_ RegionHandle hRegion) noexcept
         HideCursor();
     }
 
+    // Remove children first so their callbacks can still refer to a valid parent during cleanup.
     while (!lpsRegionCurrent->vecChildRegionIds.empty())
     {
         auto itRegion = m_mapRegions.find(lpsRegionCurrent->vecChildRegionIds.back());
@@ -1778,7 +1836,7 @@ HRESULT Buffer::DestroyRegionRecursive(_In_ RegionHandle hRegion) noexcept
         }
     }
 
-    if ((lpsRegionCurrent->bCustomDraw != FALSE) && lpsRegionCurrent->fnResourceCleanupCallback)
+    if (lpsRegionCurrent->bCustomDraw != FALSE && lpsRegionCurrent->fnResourceCleanupCallback)
     {
         lpsRegionCurrent->fnResourceCleanupCallback(CustomDrawResourceCleanupReason::RegionDestroyed);
     }
@@ -1821,6 +1879,13 @@ VOID Buffer::GetRegionVisibleTerminalRect(_In_ const Region_t &sRegion, _Out_ Ce
     LONGLONG llParentLeft;
     LONGLONG llParentTop;
 
+    if (IsRegionVisible(sRegion) == FALSE)
+    {
+        sRectVisible = CellRect_t{};
+        return;
+    }
+
+    // Intersect the region with every ancestor, then with the terminal, to enforce nested clipping.
     GetRegionTerminalOrigin(sRegion, llRegionLeft, llRegionTop);
 
     llRegionRight = llRegionLeft + static_cast<LONGLONG>(sRegion.iWidth);
@@ -1855,6 +1920,22 @@ VOID Buffer::GetRegionVisibleTerminalRect(_In_ const Region_t &sRegion, _Out_ Ce
     sRectVisible.iHeight = static_cast<INT>(llRegionBottom - llRegionTop);
 }
 
+BOOL Buffer::IsRegionVisible(_In_ const Region_t &sRegion) const noexcept
+{
+    const Region_t *lpsRegionCurrent;
+
+    lpsRegionCurrent = &sRegion;
+    while (lpsRegionCurrent)
+    {
+        if (lpsRegionCurrent->bVisible == FALSE)
+        {
+            return FALSE;
+        }
+        lpsRegionCurrent = lpsRegionCurrent->lpParent;
+    }
+    return TRUE;
+}
+
 Buffer::Cell Buffer::MakeBlankCell() const noexcept
 {
     Cell sCellBlank;
@@ -1864,7 +1945,6 @@ Buffer::Cell Buffer::MakeBlankCell() const noexcept
     sCellBlank.crForeground = m_sAttributesDefault.crForeground;
     sCellBlank.crBackground = m_sAttributesDefault.crBackground;
     sCellBlank.dwStyleFlags = Control::StyleNone;
-    sCellBlank.bIsDirty = TRUE;
     return sCellBlank;
 }
 
@@ -1908,7 +1988,6 @@ HRESULT Buffer::ResizeRegionCells(_In_ const Region_t &sRegionSource, _Out_ std:
                     GetCellIndex(iX, iY, iWidthTarget, &uTargetIndex) != FALSE)
                 {
                     vecCellsTarget[uTargetIndex] = sRegionSource.vecCells[uSourceIndex];
-                    vecCellsTarget[uTargetIndex].bIsDirty = TRUE;
                 }
             }
         }
@@ -1943,7 +2022,6 @@ VOID Buffer::SetCell(_Inout_ Region_t &sRegion, _In_ INT iX, _In_ INT iY, _In_ W
     sRegion.vecCells[uIndex].crForeground = sAttributesCell.crForeground;
     sRegion.vecCells[uIndex].crBackground = sAttributesCell.crBackground;
     sRegion.vecCells[uIndex].dwStyleFlags = sAttributesCell.dwStyleFlags;
-    sRegion.vecCells[uIndex].bIsDirty = TRUE;
 }
 
 VOID Buffer::FillCell(_Inout_ Region_t &sRegion, _In_ INT iX, _In_ INT iY, _In_ const Attributes_t &sAttributesCell) noexcept
@@ -1969,7 +2047,7 @@ VOID Buffer::FillRange(_Inout_ Region_t &sRegion, _In_ INT iXStart, _In_ INT iYS
 BOOL Buffer::IsCoordinateInsideRectangle(_In_ INT iX, _In_ INT iY, _In_ INT iStartX, _In_ INT iStartY, _In_ INT iEndX,
                                          _In_ INT iEndY) const noexcept
 {
-    return ((iX >= iStartX) && (iX <= iEndX) && (iY >= iStartY) && (iY <= iEndY)) ? TRUE : FALSE;
+    return (iX >= iStartX && iX <= iEndX && iY >= iStartY && iY <= iEndY) ? TRUE : FALSE;
 }
 
 const Buffer::Cell *Buffer::GetCell(_In_ const Region_t &sRegion, _In_ INT iX, _In_ INT iY) const noexcept
@@ -2084,7 +2162,6 @@ VOID Buffer::ScrollRegionUp(_In_opt_ RegionHandle hRegion, _In_ INT iLineCount) 
                 GetCellIndex(iX, iY, lpsRegionCurrent->iWidth, &uTargetIndex) != FALSE)
             {
                 lpsRegionCurrent->vecCells[uTargetIndex] = lpsRegionCurrent->vecCells[uSourceIndex];
-                lpsRegionCurrent->vecCells[uTargetIndex].bIsDirty = TRUE;
             }
         }
     }
@@ -2124,7 +2201,6 @@ VOID Buffer::ScrollRegionDown(_In_opt_ RegionHandle hRegion, _In_ INT iLineCount
                 GetCellIndex(iX, iY, lpsRegionCurrent->iWidth, &uTargetIndex) != FALSE)
             {
                 lpsRegionCurrent->vecCells[uTargetIndex] = lpsRegionCurrent->vecCells[uSourceIndex];
-                lpsRegionCurrent->vecCells[uTargetIndex].bIsDirty = TRUE;
             }
         }
     }
@@ -2143,6 +2219,7 @@ VOID Buffer::AdvanceCursorAfterWrite(_In_opt_ RegionHandle hRegion) noexcept
 
     if (lpsRegionCurrent->iCursorX == lpsRegionCurrent->iWidth - 1)
     {
+        // Delay wrapping until the next printable character, matching terminal autowrap behavior.
         lpsRegionCurrent->bWrapPending = TRUE;
     }
     else
@@ -2185,6 +2262,7 @@ HRESULT Buffer::ComposeRegion(_In_ const Region_t &sRegion) const noexcept
     GetRegionTerminalOrigin(sRegion, llOriginX, llOriginY);
     if (sRegion.bCustomDraw != FALSE)
     {
+        // Custom regions are layered by the renderer from their device-dependent bitmap cache.
         return S_OK;
     }
     GetRegionVisibleTerminalRect(sRegion, sRectVisible);
@@ -2212,7 +2290,6 @@ HRESULT Buffer::ComposeRegion(_In_ const Region_t &sRegion) const noexcept
                 GetCellIndex(iTerminalX, iTerminalY, m_iCols, &uTargetIndex) != FALSE)
             {
                 m_vecSnapshotCells[uTargetIndex] = sRegion.vecCells[uSourceIndex];
-                m_vecSnapshotCells[uTargetIndex].bIsDirty = TRUE;
             }
         }
     }
@@ -2231,6 +2308,12 @@ HRESULT Buffer::ComposeRegionTree(_In_ const Region_t &sRegionParent) const noex
         if (itRegion == m_mapRegions.end())
         {
             return E_UNEXPECTED;
+        }
+
+        // A hidden parent suppresses its complete subtree without changing child state.
+        if (itRegion->second.bVisible == FALSE)
+        {
+            continue;
         }
 
         hr = ComposeRegion(itRegion->second);
@@ -2254,8 +2337,14 @@ HRESULT Buffer::BuildRenderPlan(_In_ const Region_t &sRegion, _Inout_ std::vecto
     RenderItem sRenderItem;
     HRESULT hr;
 
+    if (sRegion.bVisible == FALSE)
+    {
+        return S_OK;
+    }
+
+    // Preserve parent-before-child order so the renderer can reproduce region layering.
     GetRegionVisibleTerminalRect(sRegion, sRenderItem.sVisibleRect);
-    if ((sRenderItem.sVisibleRect.iWidth > 0) && (sRenderItem.sVisibleRect.iHeight > 0))
+    if (sRenderItem.sVisibleRect.iWidth > 0 && sRenderItem.sVisibleRect.iHeight > 0)
     {
         sRenderItem.lpsRegion = &sRegion;
         GetRegionTerminalOrigin(sRegion, sRenderItem.llOriginX, sRenderItem.llOriginY);
@@ -2363,27 +2452,27 @@ VOID Buffer::AdvanceToNextTabStop(_In_opt_ RegionHandle hRegion) noexcept
 
 static BOOL IsStrokeMergeable(_In_ DWORD dwStrokeType) noexcept
 {
-    return ((dwStrokeType == GuiTerminal::Control::StrokeSingleLine) || (dwStrokeType == GuiTerminal::Control::StrokeDoubleLine)) ? TRUE
-                                                                                                                                  : FALSE;
+    return (dwStrokeType == GuiTerminal::Control::StrokeSingleLine || dwStrokeType == GuiTerminal::Control::StrokeDoubleLine) ? TRUE
+                                                                                                                              : FALSE;
 }
 
 static WCHAR GetStrokeGlyph(_In_ DWORD dwStrokeType) noexcept
 {
     switch (dwStrokeType)
     {
-    case GuiTerminal::Control::StrokeDoubleLine:
-        return L'\x2550';
-    case GuiTerminal::Control::StrokeShadeLight:
-        return L'\x2591';
-    case GuiTerminal::Control::StrokeShadeMedium:
-        return L'\x2592';
-    case GuiTerminal::Control::StrokeShadeDark:
-        return L'\x2593';
-    case GuiTerminal::Control::StrokeSolidBlock:
-        return L'\x2588';
-    case GuiTerminal::Control::StrokeSingleLine:
-    default:
-        return L'\x2500';
+        case GuiTerminal::Control::StrokeDoubleLine:
+            return L'\x2550';
+        case GuiTerminal::Control::StrokeShadeLight:
+            return L'\x2591';
+        case GuiTerminal::Control::StrokeShadeMedium:
+            return L'\x2592';
+        case GuiTerminal::Control::StrokeShadeDark:
+            return L'\x2593';
+        case GuiTerminal::Control::StrokeSolidBlock:
+            return L'\x2588';
+        case GuiTerminal::Control::StrokeSingleLine:
+        default:
+            return L'\x2500';
     }
 }
 
@@ -2400,8 +2489,7 @@ static BoxEdges MakeBoxEdges(_In_ BYTE byUp, _In_ BYTE byRight, _In_ BYTE byDown
 
 static BOOL TryDecodeBoxGlyph(_In_ WCHAR chGlyphW, _Out_ BoxEdges *lpsEdges) noexcept
 {
-    typedef struct BoxGlyphEntry_s
-    {
+    typedef struct BoxGlyphEntry_s {
         WCHAR chGlyphW;
         BoxEdges sEdges;
     } BoxGlyphEntry;
@@ -2467,8 +2555,7 @@ static BOOL TryDecodeBoxGlyph(_In_ WCHAR chGlyphW, _Out_ BoxEdges *lpsEdges) noe
 
 static BOOL TryEncodeBoxGlyph(_In_ const BoxEdges &sEdges, _Out_ WCHAR *lpchGlyphW) noexcept
 {
-    typedef struct BoxEncodeEntry_s
-    {
+    typedef struct BoxEncodeEntry_s {
         BoxEdges sEdges;
         WCHAR chGlyphW;
     } BoxEncodeEntry;
@@ -2593,7 +2680,7 @@ static GuiTerminal::Internals::Attributes_t MakeAttributes(_In_ COLORREF crForeg
 
 static BOOL IsWithinBounds(_In_ INT iValue, _In_ INT iMinimum, _In_ INT iMaximumExclusive) noexcept
 {
-    return ((iValue >= iMinimum) && (iValue < iMaximumExclusive)) ? TRUE : FALSE;
+    return (iValue >= iMinimum && iValue < iMaximumExclusive) ? TRUE : FALSE;
 }
 
 static INT ClampInt(_In_ INT iValue, _In_ INT iMinimum, _In_ INT iMaximumValue) noexcept

@@ -38,6 +38,7 @@ HRESULT DemoInitializeScrollScene(_In_ GuiTerminal::Control *lpGuiTerminal, _In_
                                  GuiTerminal::Control::BoxSideTopDouble | GuiTerminal::Control::BoxSideRightDouble, RGB(180U, 220U, 255U),
                                  RGB(8U, 12U, 20U), GuiTerminal::Control::StyleNone);
     lpGuiTerminal->WriteRegion(hRegionLog, L"\x1b[1;3H\x1b[38;5;117mBuffered output\x1b[0m");
+    // Overflow this child region deliberately to demonstrate its retained scroll behavior.
     for (iLine = 1; iLine <= 18; iLine++)
     {
         swprintf_s(szBufferW, sizeof(szBufferW) / sizeof(szBufferW[0]),

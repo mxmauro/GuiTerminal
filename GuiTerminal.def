@@ -30,6 +30,7 @@ EXPORTS
     GuiTerminalControl_PrintRegion
     GuiTerminalControl_PrintRegionV
     GuiTerminalControl_RelocateRegion
+    GuiTerminalControl_SetRegionVisible
     GuiTerminalControl_BringRegionToFront
     GuiTerminalControl_SendRegionToBack
     GuiTerminalControl_MoveRegionAfter
