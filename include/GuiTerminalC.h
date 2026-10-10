@@ -75,7 +75,9 @@ typedef struct ID2D1RenderTarget ID2D1RenderTarget;
 
 typedef enum GuiTerminalCustomDrawResourceCleanupReason_e {
     GuiTerminalCustomDrawResourceCleanupTargetLost = 0U,
-    GuiTerminalCustomDrawResourceCleanupRegionDestroyed
+    GuiTerminalCustomDrawResourceCleanupRegionDestroyed,
+    GuiTerminalCustomDrawResourceCleanupTargetResized,
+    GuiTerminalCustomDrawResourceCleanupDpiChanged
 } GuiTerminalCustomDrawResourceCleanupReason;
 
 typedef enum GuiTerminalPathSweepDirection_e {
@@ -91,14 +93,14 @@ typedef enum GuiTerminalPathArcSize_e {
 typedef VOID (*GuiTerminalCustomDrawCallback)(_In_ GuiTerminalDrawContext *lpDrawContext, _In_ GuiTerminalRegion hRegion,
                                               _In_opt_ PVOID lpDrawState);
 typedef VOID (*GuiTerminalRegionDestroyCallback)(_In_ GuiTerminalRegion hRegion, _In_opt_ PVOID lpCallbackContext);
+// GuiTerminal serializes all custom-draw and resource-cleanup callbacks for a control.
 typedef VOID (*GuiTerminalCustomDrawResourceCleanupCallback)(_In_opt_ PVOID lpDrawState,
                                                              _In_ GuiTerminalCustomDrawResourceCleanupReason cleanupReason);
 
 // -----------------------------------------------------------------------------
 
 #ifdef __cplusplus
-extern "C"
-{
+extern "C" {
 #endif
 
 GUITERMINAL_CONTROL_API
@@ -373,9 +375,6 @@ INT GuiTerminalDrawContext_GetWidth(_In_ const GuiTerminalDrawContext *lpDrawCon
 
 GUITERMINAL_CONTROL_API
 INT GuiTerminalDrawContext_GetHeight(_In_ const GuiTerminalDrawContext *lpDrawContext);
-
-GUITERMINAL_CONTROL_API
-UINT GuiTerminalDrawContext_GetDeviceGeneration(_In_ const GuiTerminalDrawContext *lpDrawContext);
 
 GUITERMINAL_CONTROL_API
 ID2D1RenderTarget *GuiTerminalDrawContext_GetDirect2DRenderTarget(_In_ const GuiTerminalDrawContext *lpDrawContext);

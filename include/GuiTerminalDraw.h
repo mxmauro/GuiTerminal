@@ -15,11 +15,15 @@ class Renderer;
 
 } // namespace Internals
 
+/** @brief Opaque handle that identifies a root-level or child region. */
 typedef Internals::Region_t *RegionHandle;
 
+/** @brief Identifies why custom-draw Direct2D resources must be released. */
 typedef enum class CustomDrawResourceCleanupReason_e : DWORD {
-    TargetLost = 0U,
-    RegionDestroyed
+    TargetLost = 0U, /**< Direct2D or DXGI requires the render target to be recreated. */
+    RegionDestroyed, /**< The region and its callback state are being removed. */
+    TargetResized,   /**< The swap-chain target is about to be resized. */
+    DpiChanged       /**< DPI-sensitive custom resources must be discarded. */
 } CustomDrawResourceCleanupReason;
 
 // -----------------------------------------------------------------------------
@@ -30,14 +34,15 @@ typedef enum class CustomDrawResourceCleanupReason_e : DWORD {
 class DrawContext
 {
   public:
+    /** @brief Selects horizontal and vertical alignment for DrawContext::Write. */
     typedef enum TextAlignment_e : DWORD {
-        AlignLeft = 0U,
-        AlignCenter = 1U << 0,
-        AlignRight = 2U << 0,
-        AlignTop = 0U,
-        AlignMiddle = 1U << 2,
-        AlignBottom = 2U << 2,
-        AlignBaseline = 3U << 2
+        AlignLeft = 0U,        /**< Align text to the reference point's left. */
+        AlignCenter = 1U << 0, /**< Center text horizontally on the reference point. */
+        AlignRight = 2U << 0,  /**< Align text to the reference point's right. */
+        AlignTop = 0U,         /**< Align text to the reference point's top. */
+        AlignMiddle = 1U << 2, /**< Center text vertically on the reference point. */
+        AlignBottom = 2U << 2, /**< Align text to the reference point's bottom. */
+        AlignBaseline = 3U << 2 /**< Align the text baseline to the reference point. */
     } TextAlignment;
 
     /** @brief Fills the custom-draw region with a color. */
@@ -111,14 +116,9 @@ class DrawContext
     INT GetHeight() const noexcept;
 
     /**
-     * @brief Returns the current Direct2D resource generation.
-     * @return A value that changes when device-dependent custom-draw resources must be recreated.
-     */
-    UINT GetDeviceGeneration() const noexcept;
-
-    /**
      * @brief Returns the underlying Direct2D render target for advanced drawing.
-     * @return The render target valid only on the renderer worker for the duration of the custom draw callback.
+     * @return The render target valid only on the renderer worker for the duration of the custom draw callback, or nullptr when
+     *         no target is available.
      */
     ID2D1RenderTarget *GetDirect2DRenderTarget() const noexcept;
 

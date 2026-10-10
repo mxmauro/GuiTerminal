@@ -9,6 +9,8 @@
 static VOID DrawCustomChart(_In_ GuiTerminal::DrawContext &drawContext, _In_ GuiTerminal::RegionHandle hRegion) noexcept;
 static GuiTerminal::RegionHandle g_hRegionChart{};
 
+// -----------------------------------------------------------------------------
+
 HRESULT DemoInitializeNestedScene(_In_ GuiTerminal::Control *lpGuiTerminal, _In_ GuiTerminal::RegionHandle hRegionScene,
                                   _Out_ GuiTerminal::RegionHandle *lphCursorRegion) noexcept
 {
@@ -113,7 +115,7 @@ VOID DemoAnimateNestedScene(_In_ GuiTerminal::Control *lpGuiTerminal) noexcept
 
 static VOID DrawCustomChart(_In_ GuiTerminal::DrawContext &drawContext, _In_ GuiTerminal::RegionHandle hRegion) noexcept
 {
-    const DWORD dwFrame = GetTickCount() / 10U;
+    const DWORD dwFrame = static_cast<DWORD>(GetTickCount64() / 10ui64);
     const FLOAT fWidth = static_cast<FLOAT>(drawContext.GetWidth());
     const FLOAT fHeight = static_cast<FLOAT>(drawContext.GetHeight());
     const FLOAT fWave1 = static_cast<FLOAT>(dwFrame % 40U) - 20.0f;

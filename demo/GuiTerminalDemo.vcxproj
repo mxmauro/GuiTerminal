@@ -86,8 +86,8 @@
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalDependencies>d2d1.lib;dwrite.lib;shcore.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <Profile Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</Profile>
-      <Profile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</Profile>
+      <Profile Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">false</Profile>
+      <Profile Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</Profile>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)'=='Release'">

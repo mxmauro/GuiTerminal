@@ -13,8 +13,11 @@
 
 namespace GuiTerminal {
 
+/** @brief Draws the Direct2D contents of a custom-draw region. */
 using CustomDrawCallback = std::function<VOID(_In_ DrawContext &drawContext, _In_ RegionHandle hRegion)>;
+/** @brief Runs immediately before a region is destroyed. */
 using RegionDestroyCallback = std::function<VOID(_In_ RegionHandle hRegion)>;
+/** @brief Releases Direct2D resources owned by a custom-draw region callback. */
 using CustomDrawResourceCleanupCallback = std::function<VOID(_In_ CustomDrawResourceCleanupReason cleanupReason)>;
 
 // -----------------------------------------------------------------------------
@@ -25,45 +28,56 @@ using CustomDrawResourceCleanupCallback = std::function<VOID(_In_ CustomDrawReso
 class Control
 {
   public:
+    /** @brief Specifies the initial grid, font, and default colors for a control. */
     typedef struct Config_s {
+        /** @brief Initial number of visible terminal rows. */
         INT iRows{25};
+        /** @brief Initial number of visible terminal columns. */
         INT iCols{80};
+        /** @brief Font family used to render terminal text. */
         LPCWSTR szFontFamilyW{L"Consolas"};
+        /** @brief Font size in device-independent pixels. */
         FLOAT fFontSize{12.0f};
+        /** @brief Foreground color applied when text supplies no ANSI color. */
         COLORREF crDefaultForeground{RGB(204U, 204U, 204U)};
+        /** @brief Background color applied when text supplies no ANSI color. */
         COLORREF crDefaultBackground{RGB(12U, 12U, 12U)};
     } Config;
 
+    /** @brief Selects text styling flags for cell content and DrawContext text. */
     typedef enum StyleFlags_e : DWORD {
-        StyleNone = 0U,
-        StyleBold = 1U << 0,
-        StyleUnderline = 1U << 1,
-        StyleBlink = 1U << 2,
-        StyleInverse = 1U << 3,
-        StyleItalic = 1U << 4
+        StyleNone = 0U,       /**< No additional text style. */
+        StyleBold = 1U << 0,  /**< Render text with a bold face where available. */
+        StyleUnderline = 1U << 1, /**< Draw an underline beneath the text. */
+        StyleBlink = 1U << 2, /**< Make the text follow the cursor blink state. */
+        StyleInverse = 1U << 3, /**< Exchange the foreground and background colors. */
+        StyleItalic = 1U << 4 /**< Render text with an italic face where available. */
     } StyleFlags;
 
+    /** @brief Selects a predefined terminal line or fill glyph. */
     typedef enum StrokeType_e : DWORD {
-        StrokeSingleLine = 0U,
-        StrokeDoubleLine,
-        StrokeShadeLight,
-        StrokeShadeMedium,
-        StrokeShadeDark,
-        StrokeSolidBlock
+        StrokeSingleLine = 0U, /**< Single-line box drawing glyph. */
+        StrokeDoubleLine,      /**< Double-line box drawing glyph. */
+        StrokeShadeLight,      /**< Light shade glyph. */
+        StrokeShadeMedium,     /**< Medium shade glyph. */
+        StrokeShadeDark,       /**< Dark shade glyph. */
+        StrokeSolidBlock       /**< Solid block glyph. */
     } StrokeType;
 
+    /** @brief Selects box edges that use double-line glyphs. */
     typedef enum BoxSideFlags_e : DWORD {
-        BoxSideNone = 0U,
-        BoxSideTopDouble = 1U << 0,
-        BoxSideRightDouble = 1U << 1,
-        BoxSideBottomDouble = 1U << 2,
-        BoxSideLeftDouble = 1U << 3
+        BoxSideNone = 0U,          /**< Draw every edge as a single line. */
+        BoxSideTopDouble = 1U << 0, /**< Draw the top edge as a double line. */
+        BoxSideRightDouble = 1U << 1, /**< Draw the right edge as a double line. */
+        BoxSideBottomDouble = 1U << 2, /**< Draw the bottom edge as a double line. */
+        BoxSideLeftDouble = 1U << 3 /**< Draw the left edge as a double line. */
     } BoxSideFlags;
 
+    /** @brief Selects the cursor shape. */
     typedef enum CursorStyle_e : DWORD {
-        CursorBlock = 0U,
-        CursorUnderscore,
-        CursorBarLeft
+        CursorBlock = 0U, /**< Filled cell-sized cursor. */
+        CursorUnderscore, /**< Horizontal cursor at the cell bottom. */
+        CursorBarLeft     /**< Vertical cursor at the cell left edge. */
     } CursorStyle;
 
   public:
@@ -233,7 +247,10 @@ class Control
      */
     HRESULT SetRegionDestroyCallback(_In_ RegionHandle hRegion, _In_ const RegionDestroyCallback &fnCallback) noexcept;
     /**
-     * @brief Sets the callback that releases custom-draw resources when they become invalid.
+     * @brief Sets the callback that releases custom-draw resources before lifecycle changes.
+     * @details The callback runs for target loss, target resize, DPI changes, and region destruction. It must be idempotent and must
+     *          not call methods on this Control. GuiTerminal serializes all custom-draw and resource-cleanup callbacks for this
+     *          Control. Resources accessed only by those callbacks need no application mutex.
      * @param fnCallback Callback to install, or an empty function to remove it.
      * @return S_OK on success; otherwise a Win32-style failure code.
      */
@@ -337,11 +354,18 @@ class Control
     VOID RequestRender() noexcept;
     HRESULT ResizeRenderTarget(_In_ UINT uiWidth, _In_ UINT uiHeight) noexcept;
     VOID UpdateScrollBars() noexcept;
-    BOOL HandleMouseMove(_In_ INT iX, _In_ INT iY) noexcept;
-    BOOL HandleMouseLeave() noexcept;
-    BOOL HandleLeftButtonDown(_In_ INT iX, _In_ INT iY, _Out_opt_ PBOOL lpbBeginCapture) noexcept;
-    BOOL HandleLeftButtonUp() noexcept;
-    BOOL HandleMouseWheel(_In_ SHORT iDelta) noexcept;
+    BOOL HandleWmEraseBkgnd(_Out_ LRESULT *lplResult) noexcept;
+    BOOL HandleWmPaint() noexcept;
+    BOOL HandleWmSize() noexcept;
+    BOOL HandleWmDpiChanged(_In_ LPARAM lParam) noexcept;
+    BOOL HandleWmMouseMove(_In_ LPARAM lParam) noexcept;
+    BOOL HandleWmMouseLeave() noexcept;
+    BOOL HandleWmLeftButtonDown(_In_ LPARAM lParam) noexcept;
+    BOOL HandleWmLeftButtonUp() noexcept;
+    BOOL HandleWmMouseWheel(_In_ WPARAM wParam) noexcept;
+    BOOL HandleWmClose() noexcept;
+    BOOL HandleWmDestroy() noexcept;
+    BOOL HandleWmNcDestroy() noexcept;
     VOID RefreshDpi() noexcept;
     VOID ToggleBlink() noexcept;
     HRESULT StartBlinkThread() noexcept;

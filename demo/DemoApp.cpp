@@ -4,7 +4,6 @@
 #include "DemoHelpers.h"
 #include "DemoLayout.h"
 #include "DemoScenes.h"
-#include <stdio.h>
 #include <windows.h>
 
 // -----------------------------------------------------------------------------
@@ -245,6 +244,7 @@ static INT HitTestButton(_In_ INT iCol, _In_ INT iRow) noexcept
 {
     INT iSceneIndex;
     INT iButtonX;
+
     if (iCol < 0 || iRow < 0)
     {
         return -1;

@@ -108,148 +108,55 @@ BOOL Control::WndProc(_In_ HWND hWnd, _In_ UINT uMessage, _In_ WPARAM wParam, _I
 
     if (lpControl->m_bShuttingDown != FALSE && uMessage != WM_CLOSE && uMessage != WM_DESTROY && uMessage != WM_NCDESTROY)
     {
-        if (uMessage == WM_PAINT)
+        switch (uMessage)
         {
-            PAINTSTRUCT sPs;
+            case WM_ERASEBKGND:
+                return lpControl->HandleWmEraseBkgnd(lplResult);
 
-            if (BeginPaint(hWnd, &sPs))
-            {
-                EndPaint(hWnd, &sPs);
-            }
-            return TRUE;
+            case WM_PAINT:
+                return lpControl->HandleWmPaint();
         }
-        return FALSE;
     }
-
-    switch (uMessage)
+    else
     {
-        case WM_ERASEBKGND:
-            *lplResult = 1;
-            return TRUE;
+        switch (uMessage)
+        {
+            case WM_ERASEBKGND:
+                return lpControl->HandleWmEraseBkgnd(lplResult);
 
-        case WM_PAINT:
-            {
-                PAINTSTRUCT sPs;
+            case WM_PAINT:
+                return lpControl->HandleWmPaint();
 
-                // Presentation is owned by the render worker; WM_PAINT only validates this window region.
-                if (BeginPaint(hWnd, &sPs))
-                {
-                    EndPaint(hWnd, &sPs);
-                }
-            }
-            return TRUE;
+            case WM_SIZE:
+                return lpControl->HandleWmSize();
 
-        case WM_SIZE:
-            {
-                RECT rcClient;
+            case WM_DPICHANGED:
+                return lpControl->HandleWmDpiChanged(lParam);
 
-                if (GetClientRect(hWnd, &rcClient) != FALSE)
-                {
-                    lpControl->ResizeRenderTarget(static_cast<UINT>(rcClient.right - rcClient.left),
-                                                  static_cast<UINT>(rcClient.bottom - rcClient.top));
-                    lpControl->RequestRender();
-                }
-            }
-            break;
+            case WM_MOUSEMOVE:
+                return lpControl->HandleWmMouseMove(lParam);
 
-        case WM_DPICHANGED:
-            {
-                LPRECT lprcSuggested;
+            case WM_MOUSELEAVE:
+                return lpControl->HandleWmMouseLeave();
 
-                lprcSuggested = reinterpret_cast<LPRECT>(lParam);
-                if (lprcSuggested)
-                {
-                    SetWindowPos(hWnd, nullptr, lprcSuggested->left, lprcSuggested->top, lprcSuggested->right - lprcSuggested->left,
-                                 lprcSuggested->bottom - lprcSuggested->top, SWP_NOZORDER | SWP_NOACTIVATE);
-                }
-                lpControl->RefreshDpi();
-                lpControl->RequestRender();
-            }
-            break;
+            case WM_LBUTTONDOWN:
+                return lpControl->HandleWmLeftButtonDown(lParam);
 
-        case WM_MOUSEMOVE:
-            if (lpControl->HandleMouseMove(GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)) != FALSE)
-            {
-                lpControl->RequestRender();
-                return TRUE;
-            }
-            break;
+            case WM_LBUTTONUP:
+                return  lpControl->HandleWmLeftButtonUp();
 
-        case WM_MOUSELEAVE:
-            if (lpControl->HandleMouseLeave() != FALSE)
-            {
-                lpControl->RequestRender();
-                return TRUE;
-            }
-            break;
+            case WM_MOUSEWHEEL:
+                return lpControl->HandleWmMouseWheel(wParam);
 
-        case WM_LBUTTONDOWN:
-            {
-                BOOL bBeginCapture;
-                INT iX;
-                INT iY;
+            case WM_CLOSE:
+                return lpControl->HandleWmClose();
 
-                bBeginCapture = FALSE;
-                iX = GET_X_LPARAM(lParam);
-                iY = GET_Y_LPARAM(lParam);
-                if (lpControl->HandleLeftButtonDown(iX, iY, &bBeginCapture) != FALSE)
-                {
-                    if (bBeginCapture != FALSE)
-                    {
-                        SetCapture(hWnd);
-                    }
-                    lpControl->RequestRender();
-                    return TRUE;
-                }
-            }
-            break;
+            case WM_DESTROY:
+                return lpControl->HandleWmDestroy();
 
-        case WM_LBUTTONUP:
-            if (lpControl->HandleLeftButtonUp() != FALSE)
-            {
-                if (GetCapture() == hWnd)
-                {
-                    ReleaseCapture();
-                }
-                lpControl->RequestRender();
-                return TRUE;
-            }
-            break;
-
-        case WM_MOUSEWHEEL:
-            if (lpControl->HandleMouseWheel(GET_WHEEL_DELTA_WPARAM(wParam)) != FALSE)
-            {
-                lpControl->RequestRender();
-                return TRUE;
-            }
-            break;
-
-        case WM_CLOSE:
-            lpControl->StopRenderThread(TRUE);
-            break;
-
-        case WM_DESTROY:
-            lpControl->StopRenderThread(TRUE);
-            break;
-
-        case WM_NCDESTROY:
-            {
-                {
-                    std::lock_guard<std::mutex> lockGuard(m_mapMutex);
-
-                    m_mapControls.erase(hWnd);
-                }
-
-                lpControl->StopRenderThread(FALSE);
-                lpControl->StopBlinkThread();
-                if (GetCapture() == hWnd)
-                {
-                    ReleaseCapture();
-                }
-
-                delete lpControl;
-            }
-            break;
+            case WM_NCDESTROY:
+                return lpControl->HandleWmNcDestroy();
+        }
     }
 
     return FALSE;
@@ -989,108 +896,248 @@ VOID Control::UpdateScrollBars() noexcept
     }
 }
 
-BOOL Control::HandleMouseMove(_In_ INT iX, _In_ INT iY) noexcept
+BOOL Control::HandleWmEraseBkgnd(_Out_ LRESULT *lplResult) noexcept
 {
-    std::lock_guard<std::mutex> lockGuard(m_mutex);
-    TRACKMOUSEEVENT trackMouseEvent;
-    BOOL bConsumed;
+    *lplResult = 1;
+    return TRUE;
+}
 
-    if (m_bTrackingMouse == FALSE)
+BOOL Control::HandleWmPaint() noexcept
+{
+    PAINTSTRUCT sPs;
+
+    if (BeginPaint(m_hWnd, &sPs))
     {
-        trackMouseEvent = TRACKMOUSEEVENT{};
-        trackMouseEvent.cbSize = sizeof(trackMouseEvent);
-        trackMouseEvent.dwFlags = TME_LEAVE;
-        trackMouseEvent.hwndTrack = m_hWnd;
-        if (TrackMouseEvent(&trackMouseEvent) != FALSE)
+        EndPaint(m_hWnd, &sPs);
+    }
+    return TRUE;
+}
+
+BOOL Control::HandleWmSize() noexcept
+{
+    RECT rcClient;
+
+    if (GetClientRect(m_hWnd, &rcClient) != FALSE)
+    {
+        ResizeRenderTarget(static_cast<UINT>(rcClient.right - rcClient.left),
+                           static_cast<UINT>(rcClient.bottom - rcClient.top));
+        RequestRender();
+    }
+    return FALSE;
+}
+
+BOOL Control::HandleWmDpiChanged(_In_ LPARAM lParam) noexcept
+{
+    LPRECT lprcSuggested;
+
+    lprcSuggested = reinterpret_cast<LPRECT>(lParam);
+    if (lprcSuggested)
+    {
+        SetWindowPos(m_hWnd, nullptr, lprcSuggested->left, lprcSuggested->top, lprcSuggested->right - lprcSuggested->left,
+                     lprcSuggested->bottom - lprcSuggested->top, SWP_NOZORDER | SWP_NOACTIVATE);
+    }
+    RefreshDpi();
+    RequestRender();
+    return FALSE;
+}
+
+BOOL Control::HandleWmMouseMove(_In_ LPARAM lParam) noexcept
+{                                               
+    INT iX = GET_X_LPARAM(lParam);
+    INT iY = GET_Y_LPARAM(lParam);
+    BOOL bConsumed = FALSE;
+
+    {
+        std::lock_guard<std::mutex> lockGuard(m_mutex);
+
+        if (m_bTrackingMouse == FALSE)
         {
-            m_bTrackingMouse = TRUE;
+            TRACKMOUSEEVENT sTrackMouseEvent;
+
+            memset(&sTrackMouseEvent, 0, sizeof(sTrackMouseEvent));
+            sTrackMouseEvent.cbSize = sizeof(sTrackMouseEvent);
+            sTrackMouseEvent.dwFlags = TME_LEAVE;
+            sTrackMouseEvent.hwndTrack = m_hWnd;
+            if (TrackMouseEvent(&sTrackMouseEvent) != FALSE)
+            {
+                m_bTrackingMouse = TRUE;
+            }
+        }
+
+        if (m_bDraggingScrollBar != FALSE)
+        {
+            if (m_scrollBarPartDragging == ScrollBarPartVerticalThumb)
+            {
+                bConsumed = m_sRenderer.ScrollFromThumbDrag(TRUE, iY, m_iScrollDragOriginY, m_iScrollOffsetOriginY);
+            }
+            else if (m_scrollBarPartDragging == ScrollBarPartHorizontalThumb)
+            {
+                bConsumed = m_sRenderer.ScrollFromThumbDrag(FALSE, iX, m_iScrollDragOriginX, m_iScrollOffsetOriginX);
+            }
+            else
+            {
+                bConsumed = TRUE;
+            }
+        }
+        else
+        {
+            bConsumed = (m_sRenderer.HitTestScrollBars(iX, iY, nullptr, nullptr) != FALSE) ? TRUE : FALSE;
+            if (m_sRenderer.HandleMouseMove(iX, iY) != FALSE)
+            {
+                bConsumed = TRUE;
+            }
         }
     }
 
-    if (m_bDraggingScrollBar != FALSE)
+    if (bConsumed)
     {
-        if (m_scrollBarPartDragging == ScrollBarPartVerticalThumb)
-        {
-            return m_sRenderer.ScrollFromThumbDrag(TRUE, iY, m_iScrollDragOriginY, m_iScrollOffsetOriginY);
-        }
-        if (m_scrollBarPartDragging == ScrollBarPartHorizontalThumb)
-        {
-            return m_sRenderer.ScrollFromThumbDrag(FALSE, iX, m_iScrollDragOriginX, m_iScrollOffsetOriginX);
-        }
-        return TRUE;
-    }
-
-    bConsumed = (m_sRenderer.HitTestScrollBars(iX, iY, nullptr, nullptr) != FALSE) ? TRUE : FALSE;
-    if (m_sRenderer.HandleMouseMove(iX, iY) != FALSE)
-    {
-        return TRUE;
+        RequestRender();
     }
     return bConsumed;
 }
 
-BOOL Control::HandleMouseLeave() noexcept
+BOOL Control::HandleWmMouseLeave() noexcept
 {
-    std::lock_guard<std::mutex> lockGuard(m_mutex);
+    BOOL bConsumed;
 
-    m_bTrackingMouse = FALSE;
-    return m_sRenderer.HandleMouseLeave();
+    {
+        std::lock_guard<std::mutex> lockGuard(m_mutex);
+
+        m_bTrackingMouse = FALSE;
+        bConsumed = m_sRenderer.HandleMouseLeave();
+    }
+
+    if (bConsumed)
+    {
+        RequestRender();
+    }
+    return bConsumed;
 }
 
-BOOL Control::HandleLeftButtonDown(_In_ INT iX, _In_ INT iY, _Out_opt_ PBOOL lpbBeginCapture) noexcept
+BOOL Control::HandleWmLeftButtonDown(_In_ LPARAM lParam) noexcept
 {
-    std::lock_guard<std::mutex> lockGuard(m_mutex);
-    BOOL bVertical;
-    BOOL bThumb;
+    INT iX = GET_X_LPARAM(lParam);
+    INT iY = GET_Y_LPARAM(lParam);
+    BOOL bBeginCapture = FALSE;
+    BOOL bConsumed = FALSE;
 
-    if (lpbBeginCapture)
     {
-        *lpbBeginCapture = FALSE;
-    }
+        std::lock_guard<std::mutex> lockGuard(m_mutex);
+        BOOL bVertical;
+        BOOL bThumb;
 
-    if (m_sRenderer.HitTestScrollBars(iX, iY, &bVertical, &bThumb) == FALSE)
-    {
-        return FALSE;
-    }
-    if (bThumb != FALSE)
-    {
-        // Retain the pointer and scroll origins so each mouse move can calculate an absolute drag offset.
-        m_bDraggingScrollBar = TRUE;
-        m_scrollBarPartDragging = (bVertical != FALSE) ? ScrollBarPartVerticalThumb : ScrollBarPartHorizontalThumb;
-        m_iScrollDragOriginX = iX;
-        m_iScrollDragOriginY = iY;
-        m_iScrollOffsetOriginX = m_sRenderer.GetScrollOffsetX();
-        m_iScrollOffsetOriginY = m_sRenderer.GetScrollOffsetY();
-        if (lpbBeginCapture)
+        if (m_sRenderer.HitTestScrollBars(iX, iY, &bVertical, &bThumb) != FALSE)
         {
-            *lpbBeginCapture = TRUE;
+            if (bThumb != FALSE)
+            {
+                // Retain the pointer and scroll origins so each mouse move can calculate an absolute drag offset.
+                m_bDraggingScrollBar = TRUE;
+                m_scrollBarPartDragging = (bVertical != FALSE) ? ScrollBarPartVerticalThumb : ScrollBarPartHorizontalThumb;
+                m_iScrollDragOriginX = iX;
+                m_iScrollDragOriginY = iY;
+                m_iScrollOffsetOriginX = m_sRenderer.GetScrollOffsetX();
+                m_iScrollOffsetOriginY = m_sRenderer.GetScrollOffsetY();
+                bBeginCapture = TRUE;
+                bConsumed = TRUE;
+            }
+            else
+            {
+                bConsumed = m_sRenderer.ScrollByTrackClick(bVertical, (bVertical != FALSE) ? iY : iX);
+            }
         }
-        return TRUE;
     }
-    return m_sRenderer.ScrollByTrackClick(bVertical, (bVertical != FALSE) ? iY : iX);
+
+    if (bConsumed)
+    {
+        if (bBeginCapture != FALSE)
+        {
+            SetCapture(m_hWnd);
+        }
+        RequestRender();
+    }
+    return bConsumed;
 }
 
-BOOL Control::HandleLeftButtonUp() noexcept
+BOOL Control::HandleWmLeftButtonUp() noexcept
 {
-    std::lock_guard<std::mutex> lockGuard(m_mutex);
     BOOL bWasDragging;
 
-    bWasDragging = m_bDraggingScrollBar;
-    m_bDraggingScrollBar = FALSE;
-    m_scrollBarPartDragging = ScrollBarPartNone;
+    {
+        std::lock_guard<std::mutex> lockGuard(m_mutex);
+
+        bWasDragging = m_bDraggingScrollBar;
+        m_bDraggingScrollBar = FALSE;
+        m_scrollBarPartDragging = ScrollBarPartNone;
+    }
+
+    if (bWasDragging)
+    {
+        if (GetCapture() == m_hWnd)
+        {
+            ReleaseCapture();
+        }
+        RequestRender();
+    }
     return bWasDragging;
 }
 
-BOOL Control::HandleMouseWheel(_In_ SHORT iDelta) noexcept
+BOOL Control::HandleWmMouseWheel(_In_ WPARAM wParam) noexcept
 {
-    std::lock_guard<std::mutex> lockGuard(m_mutex);
+    SHORT iDelta = GET_WHEEL_DELTA_WPARAM(wParam);
+    BOOL bConsumed;
 
-    return m_sRenderer.ScrollByWheelDelta(iDelta);
+    {
+        std::lock_guard<std::mutex> lockGuard(m_mutex);
+
+        bConsumed = m_sRenderer.ScrollByWheelDelta(iDelta);
+    }
+
+    if (bConsumed)
+    {
+        RequestRender();
+    }
+    return bConsumed;
 }
+
+BOOL Control::HandleWmClose() noexcept
+{
+    StopRenderThread(TRUE);
+    return FALSE;
+}
+
+BOOL Control::HandleWmDestroy() noexcept
+{
+    StopRenderThread(TRUE);
+    return FALSE;
+}
+
+BOOL Control::HandleWmNcDestroy() noexcept
+{
+    {
+        std::lock_guard<std::mutex> lockGuard(m_mapMutex);
+
+        m_mapControls.erase(m_hWnd);
+    }
+
+    StopRenderThread(FALSE);
+    StopBlinkThread();
+
+    if (GetCapture() == m_hWnd)
+    {
+        ReleaseCapture();
+    }
+
+    delete this;
+
+    return FALSE;
+}
+
 
 VOID Control::RefreshDpi() noexcept
 {
     std::lock_guard<std::mutex> lockGuard(m_mutex);
 
+    m_sBuffer.NotifyCustomDrawResourceCleanup(CustomDrawResourceCleanupReason::DpiChanged);
     m_sRenderer.RefreshDpi();
     UpdateScrollBars();
     RequestRender();
@@ -1162,6 +1209,7 @@ VOID Control::BlinkThreadEntry(_In_ Control *lpControl) noexcept
         return;
     }
 
+    // Sleep until an API or window operation requests work from the render thread.
     for (;;)
     {
         // Blink changes renderer state without relying on a window paint message.
@@ -1193,6 +1241,7 @@ HRESULT Control::StartRenderThread() noexcept
         m_hRenderStopEvent = nullptr;
         return hr;
     }
+
     hr = S_OK;
     try
     {
@@ -1314,18 +1363,25 @@ VOID Control::RenderThread() noexcept
             break;
         }
         m_bRenderRequested.exchange(FALSE);
+        // Drain requests that arrive while rendering, without returning to the outer event wait.
         for (;;)
         {
             HANDLE hFrameLatency;
+            BOOL bWaitForFrameLatency;
 
             {
                 // Avoid issuing a new frame until DXGI can accept it without queueing latency.
                 std::lock_guard<std::mutex> lockGuard(m_mutex);
 
-                hFrameLatency = m_sRenderer.ConsumeFrameLatencyWaitableObject();
+                hFrameLatency = m_sRenderer.GetFrameLatencyWaitableObject();
+                bWaitForFrameLatency = m_sRenderer.ConsumeFrameLatencyWait();
             }
-            if (hFrameLatency)
+            if (bWaitForFrameLatency != FALSE)
             {
+                if (!hFrameLatency)
+                {
+                    return;
+                }
                 aWaitHandles[0] = m_hRenderStopEvent;
                 aWaitHandles[1] = hFrameLatency;
                 dwWaitResult = WaitForMultipleObjects(2U, aWaitHandles, FALSE, INFINITE);

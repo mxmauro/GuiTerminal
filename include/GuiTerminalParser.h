@@ -8,17 +8,28 @@ namespace GuiTerminal {
 
 namespace Internals {
 
+/**
+ * @brief Parses GuiTerminal's supported ANSI text sequences into Buffer operations.
+ * @remarks This is a lower-level library contract. Applications normally use Control::Write or Control::Print instead.
+ */
 class Parser
 {
   public:
+    /** @brief Creates a parser that writes into a root or child region of a buffer. */
     explicit Parser(_Inout_ Buffer &sBuffer, _In_opt_ RegionHandle hRegion) noexcept;
+    /** @brief Prevents copying parser state. */
     Parser(const Parser &) = delete;
+    /** @brief Prevents moving parser state. */
     Parser(Parser &&) = delete;
+    /** @brief Destroys the parser. */
     ~Parser() noexcept = default;
 
+    /** @brief Prevents copy assignment. */
     Parser &operator=(const Parser &) = delete;
+    /** @brief Prevents move assignment. */
     Parser &operator=(Parser &&) = delete;
 
+    /** @brief Consumes null-terminated text and applies supported ANSI sequences to the selected region. */
     VOID Feed(_In_z_ LPCWSTR szTextW) noexcept;
 
   private:

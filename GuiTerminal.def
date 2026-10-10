@@ -75,5 +75,4 @@ EXPORTS
     GuiTerminalDrawContext_FillPath
     GuiTerminalDrawContext_GetWidth
     GuiTerminalDrawContext_GetHeight
-    GuiTerminalDrawContext_GetDeviceGeneration
     GuiTerminalDrawContext_GetDirect2DRenderTarget

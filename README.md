@@ -146,6 +146,11 @@ vcpkg install --triplet x64-windows
 
 Replace the triplet with the one that matches your project.
 
+## AI guidance
+
+For optional GuiTerminal usage guidance for coding agents, including an `AGENTS.md` template that
+points to the documentation installed by vcpkg, see [README.AI.md](README.AI.md).
+
 ## Visual Studio projects
 
 The existing Visual Studio projects are still present for local development. They now default to:
@@ -163,6 +168,7 @@ Recent public API additions include:
 - Mouse click events for left, right, and middle buttons, with down/up state and `CTRL` / `ALT` modifiers.
 - Region coordinate conversion helpers to map zero-based terminal coordinates to and from zero-based sub-region coordinates.
 - Cell geometry helpers to map zero-based cells to client-space pixel rectangles, and client-space pixel positions back to zero-based cells.
+- Custom-draw resource cleanup notifications for target loss, target resize, DPI changes, and region destruction.
 
 ## LICENSE
 

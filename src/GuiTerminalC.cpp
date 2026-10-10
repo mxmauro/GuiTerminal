@@ -11,8 +11,7 @@ static GuiTerminal::Control::Config ToCppConfig(const GuiTerminalControlConfig &
 
 // -----------------------------------------------------------------------------
 
-extern "C"
-{
+extern "C" {
 
 HRESULT GuiTerminalControl_Create(_In_ HWND hWnd, _In_ const GuiTerminalControlConfig *lpConfig, _Out_ GuiTerminalControl **lplpControl)
 {
@@ -215,7 +214,8 @@ HRESULT GuiTerminalControl_CreateCustomDrawRegion(_In_ GuiTerminalControl *lpCon
     {
         // Adapt the C callback and its caller-owned state to the C++ renderer callback contract.
         fnDrawCallback = [lpDrawCallback, lpDrawState](_In_ GuiTerminal::DrawContext &drawContext,
-                                                       _In_ GuiTerminal::RegionHandle hRegionCallback) noexcept {
+                                                       _In_ GuiTerminal::RegionHandle hRegionCallback) noexcept
+        {
             lpDrawCallback(reinterpret_cast<GuiTerminalDrawContext *>(&drawContext), ToCRegion(hRegionCallback), lpDrawState);
         };
     }
@@ -899,11 +899,6 @@ INT GuiTerminalDrawContext_GetWidth(_In_ const GuiTerminalDrawContext *lpDrawCon
 INT GuiTerminalDrawContext_GetHeight(_In_ const GuiTerminalDrawContext *lpDrawContext)
 {
     return lpDrawContext ? reinterpret_cast<const GuiTerminal::DrawContext *>(lpDrawContext)->GetHeight() : 0;
-}
-
-UINT GuiTerminalDrawContext_GetDeviceGeneration(_In_ const GuiTerminalDrawContext *lpDrawContext)
-{
-    return lpDrawContext ? reinterpret_cast<const GuiTerminal::DrawContext *>(lpDrawContext)->GetDeviceGeneration() : 0U;
 }
 
 ID2D1RenderTarget *GuiTerminalDrawContext_GetDirect2DRenderTarget(_In_ const GuiTerminalDrawContext *lpDrawContext)

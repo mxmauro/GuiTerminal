@@ -205,11 +205,6 @@ INT GuiTerminal::DrawContext::GetHeight() const noexcept
     return m_iHeight;
 }
 
-UINT GuiTerminal::DrawContext::GetDeviceGeneration() const noexcept
-{
-    return m_lpRenderer->GetDeviceGeneration();
-}
-
 ID2D1RenderTarget *GuiTerminal::DrawContext::GetDirect2DRenderTarget() const noexcept
 {
     return m_lpRenderer->GetRenderTarget();
@@ -304,7 +299,7 @@ HRESULT Renderer::Render(_In_ const Buffer &bufferGuiTerminal) noexcept
 
     for (iAttempt = 0; iAttempt < 2; iAttempt++)
     {
-        hr = CreateDeviceResources();
+        hr = CreateDeviceResources(bufferGuiTerminal);
         if (hr == S_FALSE)
         {
             return S_OK;
@@ -1073,22 +1068,19 @@ VOID Renderer::FillPath(_In_ COLORREF crColor) noexcept
     }
 }
 
-UINT Renderer::GetDeviceGeneration() const noexcept
+HANDLE Renderer::GetFrameLatencyWaitableObject() const noexcept
 {
-    return m_uiDeviceGeneration;
+    return m_hFrameLatencyWaitableObject;
 }
 
-HANDLE Renderer::ConsumeFrameLatencyWaitableObject() noexcept
+BOOL Renderer::ConsumeFrameLatencyWait() noexcept
 {
-    HANDLE hFrameLatencyWaitableObject;
-
     if (m_bWaitForFrameLatency == FALSE)
     {
-        return nullptr;
+        return FALSE;
     }
     m_bWaitForFrameLatency = FALSE;
-    hFrameLatencyWaitableObject = m_hFrameLatencyWaitableObject;
-    return hFrameLatencyWaitableObject;
+    return TRUE;
 }
 
 VOID Renderer::InvalidateCustomDrawRegion(_In_opt_ RegionHandle hRegion) noexcept
@@ -1447,7 +1439,6 @@ VOID Renderer::RefreshDpi() noexcept
     }
     // Font pixel metrics and custom bitmap dimensions change with DPI, so cached composition cannot survive it.
     UpdateViewportLayout();
-    m_uiDeviceGeneration += 1U;
     InvalidateCustomDrawRegion(nullptr);
     InvalidateComposition();
 }
@@ -1477,7 +1468,7 @@ HRESULT Renderer::CreateDeviceIndependentResources() noexcept
     return S_OK;
 }
 
-HRESULT Renderer::CreateDeviceResources() noexcept
+HRESULT Renderer::CreateDeviceResources(_In_ const Buffer &bufferGuiTerminal) noexcept
 {
     DXGI_SWAP_CHAIN_DESC1 sSwapChainDesc;
     Microsoft::WRL::ComPtr<IDXGIDevice> dxgiDevice;
@@ -1495,7 +1486,7 @@ HRESULT Renderer::CreateDeviceResources() noexcept
     {
         if (m_uiRenderTargetWidth != static_cast<UINT>(m_iClientWidth) || m_uiRenderTargetHeight != static_cast<UINT>(m_iClientHeight))
         {
-            return ResizeDeviceResources();
+            return ResizeDeviceResources(bufferGuiTerminal);
         }
         return S_OK;
     }
@@ -1545,7 +1536,7 @@ HRESULT Renderer::CreateDeviceResources() noexcept
     sSwapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
     sSwapChainDesc.BufferCount = 3U;
     sSwapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_SEQUENTIAL;
-    sSwapChainDesc.Scaling = DXGI_SCALING_STRETCH;
+    sSwapChainDesc.Scaling = DXGI_SCALING_NONE;
     sSwapChainDesc.AlphaMode = DXGI_ALPHA_MODE_IGNORE;
     sSwapChainDesc.Flags = DXGI_SWAP_CHAIN_FLAG_FRAME_LATENCY_WAITABLE_OBJECT;
     hr = dxgiFactory->CreateSwapChainForHwnd(m_d3dDevice.Get(), m_hWnd, &sSwapChainDesc, nullptr, nullptr, swapChain.GetAddressOf());
@@ -1598,7 +1589,6 @@ HRESULT Renderer::CreateTargetBitmap() noexcept
     }
     m_uiRenderTargetWidth = static_cast<UINT>(m_iClientWidth);
     m_uiRenderTargetHeight = static_cast<UINT>(m_iClientHeight);
-    m_uiDeviceGeneration += 1U;
     return CreateCompositionBitmap();
 }
 
@@ -1622,10 +1612,11 @@ HRESULT Renderer::CreateCompositionBitmap() noexcept
     return S_OK;
 }
 
-HRESULT Renderer::ResizeDeviceResources() noexcept
+HRESULT Renderer::ResizeDeviceResources(_In_ const Buffer &bufferGuiTerminal) noexcept
 {
     HRESULT hr;
 
+    const_cast<Buffer &>(bufferGuiTerminal).NotifyCustomDrawResourceCleanup(CustomDrawResourceCleanupReason::TargetResized);
     // Direct2D must release its swap-chain target before DXGI can resize the underlying buffers.
     m_renderTarget->SetTarget(nullptr);
     m_targetBitmap.Reset();
@@ -1663,6 +1654,7 @@ VOID Renderer::DiscardDeviceResources() noexcept
     m_uiRenderTargetWidth = 0U;
     m_uiRenderTargetHeight = 0U;
     m_hFrameLatencyWaitableObject = nullptr;
+    m_bWaitForFrameLatency = FALSE;
     m_vecCachedCells.clear();
     m_mapCustomDrawCaches.clear();
     InvalidateComposition();
@@ -1674,7 +1666,6 @@ VOID Renderer::InvalidateComposition() noexcept
     m_bScrollBarsDirty = TRUE;
     m_bFrameReady = FALSE;
     m_bFrameFull = TRUE;
-    m_bWaitForFrameLatency = FALSE;
     m_uDirtyCount = 0U;
 }
 
