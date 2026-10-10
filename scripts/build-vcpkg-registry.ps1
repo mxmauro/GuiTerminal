@@ -356,6 +356,7 @@ vcpkg_cmake_config_fixup(CONFIG_PATH $CMakeConfigPath)
 
 file(REMOVE_RECURSE "`${CURRENT_PACKAGES_DIR}/debug/include")
 file(INSTALL "`${CMAKE_CURRENT_LIST_DIR}/usage" DESTINATION "`${CURRENT_PACKAGES_DIR}/share/`${PORT}")
+file(INSTALL "`${SOURCE_PATH}/docs" DESTINATION "`${CURRENT_PACKAGES_DIR}/share/`${PORT}")
 
 vcpkg_install_copyright(FILE_LIST "`${SOURCE_PATH}/LICENSE")
 "@
@@ -384,6 +385,7 @@ vcpkg_cmake_config_fixup(CONFIG_PATH $CMakeConfigPath)
 
 file(REMOVE_RECURSE "`${CURRENT_PACKAGES_DIR}/debug/include")
 file(INSTALL "`${CMAKE_CURRENT_LIST_DIR}/usage" DESTINATION "`${CURRENT_PACKAGES_DIR}/share/`${PORT}")
+file(INSTALL "`${SOURCE_PATH}/docs" DESTINATION "`${CURRENT_PACKAGES_DIR}/share/`${PORT}")
 
 vcpkg_install_copyright(FILE_LIST "`${SOURCE_PATH}/LICENSE")
 "@
@@ -419,6 +421,10 @@ Static-library triplets install both the C++ and C headers.
 Shared-library triplets install the C wrapper header only:
 
     #include <$SharedHeaderName>
+
+AI-oriented integration documentation is installed at:
+
+    share/guiterminal/docs/ai-index.md
 "@
 Set-Content -Path (Join-Path $portRoot "usage") -Value $usage -Encoding UTF8
 
