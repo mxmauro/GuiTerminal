@@ -1,42 +1,27 @@
 ---
 name: windows-cpp-style
-description: "Apply a consistent Win32 C++ style when editing handwritten C++ source or headers; follow local API conventions."
+description: Apply a Win32-aware C and C++ style when editing handwritten native Windows source or headers while preserving local SDK conventions.
 ---
 
-# Windows C++ Style
+# Windows C/C++ Style
 
-Use this skill for handwritten C++ source and headers. Follow repository formatting guidance for other file types, and preserve
-module-specific public names instead of renaming them for consistency.
+Use this skill for handwritten native Windows C or C++ source and headers. Local `AGENTS.md`, `.editorconfig`, `.gitattributes`, and surrounding first-party code decide naming, encoding, line endings, and API conventions.
 
 ## Layout and declarations
 
-- Use UTF-8 with CRLF endings, four spaces, no trailing whitespace, a final newline, and lines of at most 140 characters
-  unless effectively unbreakable.
-- Use Allman braces for declarations and control flow. Always brace `if`, `else`, `for`, `while`, and `do` bodies. Keep the
-  opening brace on the same line only for `typedef struct` and `typedef enum` declarations.
-- Keep compact namespaces (`namespace X {`) without scope-only indentation and comment each namespace closing brace.
-- Keep one blank line between function definitions. Use blank lines and the existing separator comments for logical sections,
-  but avoid excess vertical whitespace.
-- Keep calls, declarations, and expressions on one line whenever they fit. When wrapping is necessary, align continuation text
-  one character after the outer opening parenthesis; keep binary operators with the preceding expression.
-- Declare file-local helpers as `static` near the beginning of the translation unit, before the main function bodies. Prefer
-  explicit types; use `auto` only where the deduced iterator or init-statement type is clear.
+- Use the repository's established indentation, encoding, and line endings. In the absence of local rules, use four spaces, a final newline, no trailing whitespace, and practical lines of at most 140 characters.
+- Use Allman braces for declarations and control flow where the repository follows that style. Always brace `if`, `else`, `for`, `while`, and `do` bodies. Preserve same-line `typedef struct` or `typedef enum` forms where established.
+- Keep namespaces, blank lines, wrapping, `switch` labels, separator comments, include order, and file-local helper placement consistent with adjacent code.
+- Prefer explicit types; use `auto` only where the deduced type is clear and matches local practice. Initialize variables at declaration or immediately before first use, and prefer early validation/failure returns.
 
 ## Windows conventions
 
-- Follow the codebase's established Win32 types and APIs. When it uses `HRESULT`, `BOOL`, SAL annotations, or wide-character
-  APIs, preserve those boundaries and their associated success/failure conventions.
-- Preserve local type, class, member, parameter, and variable naming conventions. Do not rename public or established symbols
-  merely to make them look more modern.
-- Keep headers in the established local/project, platform, and external/STL ordering. Do not reorder or modernize surrounding
-  code without a task reason.
+- Follow the codebase's established Win32 types and APIs. When it uses `HRESULT`, `BOOL`, SAL annotations, COM patterns, or wide-character APIs, preserve the associated success/failure and ownership conventions.
+- Preserve local class, type, member, parameter, and variable naming, including Hungarian prefixes and legacy SDK patterns. Do not rename established symbols merely to modernize them.
+- Retain API qualifiers and ABI-relevant details such as `extern "C"`, `noexcept`, calling conventions, packed layouts, bitfields, deleted operations, and binary-compatible public declarations unless the task explicitly changes the interface.
 
-## Expressions, comments, and control flow
+## Expressions and comments
 
-- Use parentheses only where they clarify precedence: add them for mixed `&&`/`||` chains and unary negation inside larger
-  expressions, but not for obvious homogeneous expressions.
-- Prefer early validation and failure returns. Initialize variables at declaration or immediately before first use.
-- Preserve `switch` formatting: indent `case` labels inside the switch and put each `break;` on its own line.
-- Write sparse functional comments that describe intent, ownership, constraints, or section purpose. Do not narrate obvious
-  individual statements.
+- Use parentheses where they clarify precedence, especially mixed `&&`/`||` chains or unary negation in a larger expression; avoid mechanical redundant grouping.
+- Write sparse functional comments that explain ownership, constraints, intent, or section purpose. Do not narrate obvious statements.
 - Match the surrounding file and avoid style-only rewrites outside the code directly touched by the task.

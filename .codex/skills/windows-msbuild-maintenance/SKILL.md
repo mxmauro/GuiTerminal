@@ -1,18 +1,15 @@
 ---
 name: windows-msbuild-maintenance
-description: "Maintain Windows MSBuild project metadata, file lists, dependencies, and build validation."
+description: Maintain Windows MSBuild project metadata, file lists, dependencies, and build validation.
 ---
 
 # Windows MSBuild Maintenance
 
-Use this skill when adding, renaming, or removing project-tracked files; editing MSBuild metadata; maintaining manifest
-dependencies; or selecting a safe build validation command. Read local repository guidance for project-specific paths, targets,
-generated directories, and dependency configuration.
+Use this skill when adding, renaming, or removing project-tracked files; editing MSBuild metadata; maintaining manifest dependencies; or selecting a safe build validation command. Read local repository guidance for project-specific paths, targets, generated directories, and dependency configuration.
 
 ## File-List Rules
 
-- When adding, renaming, or removing `.cpp`, `.h`, `.rc`, `.ico`, or other project-tracked files, update the affected
-  `.vcxproj`.
+- When adding, renaming, or removing `.cpp`, `.h`, `.rc`, `.ico`, or other project-tracked files, update the affected `.vcxproj`.
 - Update the matching `.vcxproj.filters` so Solution Explorer stays organized.
 - Do not edit generated outputs under `bin\`, `obj\`, `.vs\`, `lib\`, `libs\`, or `vcpkg_installed\`.
 - Avoid editing `*.vcxproj.user` unless the task explicitly calls for user-local IDE state changes.
@@ -31,5 +28,4 @@ generated directories, and dependency configuration.
 
 - After file-list changes, verify both the `.vcxproj` and `.filters` entries reference the same relative paths.
 - After dependency changes, review both manifest files together and confirm custom registry mappings still match dependencies.
-- After build-system changes, prefer a project build in the proper Visual Studio environment rather than guessing from an
-  unconfigured shell.
+- After build-system changes, prefer a project build in the proper Visual Studio environment rather than guessing from an unconfigured shell.
