@@ -56,6 +56,7 @@ EXPORTS
     GuiTerminalControl_GetPreferredClientSize
     GuiTerminalControl_GetPreferredWindowSize
     GuiTerminalControl_GetCellSize
+    GuiTerminalControl_GetScrollBarThickness
     GuiTerminalControl_GetCellPosition
     GuiTerminalControl_GetCellFromPosition
     GuiTerminalDrawContext_Clear

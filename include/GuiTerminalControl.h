@@ -327,6 +327,9 @@ class Control
 
     /** @brief Retrieves the size of one terminal cell in pixels. */
     HRESULT GetCellSize(_Out_ LPSIZE lpSize) const noexcept;
+    /** @brief Returns the DPI-scaled scrollbar thickness in client pixels. */
+    INT GetScrollBarThickness() const noexcept;
+
     /**
      * @brief Retrieves the client rectangle occupied by a terminal cell.
      * @return TRUE when the cell is visible; otherwise FALSE.

@@ -786,6 +786,13 @@ HRESULT Control::GetCellSize(_Out_ LPSIZE lpSize) const noexcept
     return m_sRenderer.GetCellSize(lpSize);
 }
 
+INT Control::GetScrollBarThickness() const noexcept
+{
+    std::lock_guard<std::mutex> lockGuard(m_mutex);
+
+    return m_sRenderer.GetScrollBarThickness();
+}
+
 BOOL Control::GetCellPosition(_In_ INT iCol, _In_ INT iRow, _Out_ LPRECT lprcCell) const noexcept
 {
     std::lock_guard<std::mutex> lockGuard(m_mutex);

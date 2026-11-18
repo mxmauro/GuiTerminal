@@ -314,6 +314,10 @@ HRESULT GuiTerminalControl_GetPreferredWindowSize(_In_ const GuiTerminalControl 
 GUITERMINAL_CONTROL_API
 HRESULT GuiTerminalControl_GetCellSize(_In_ const GuiTerminalControl *lpControl, _Out_ LPSIZE lpSize);
 
+// Returns the DPI-scaled scrollbar thickness in client pixels, or zero when lpControl is null.
+GUITERMINAL_CONTROL_API
+INT GuiTerminalControl_GetScrollBarThickness(_In_ const GuiTerminalControl *lpControl);
+
 GUITERMINAL_CONTROL_API
 BOOL GuiTerminalControl_GetCellPosition(_In_ const GuiTerminalControl *lpControl, _In_ INT iCol, _In_ INT iRow, _Out_ LPRECT lprcCell);
 

@@ -1169,6 +1169,11 @@ BOOL Renderer::HasVisibleScrollBars() const noexcept
     return (m_scrollBarHorizontal.bVisible != FALSE || m_scrollBarVertical.bVisible != FALSE) ? TRUE : FALSE;
 }
 
+INT Renderer::GetScrollBarThickness() const noexcept
+{
+    return m_iScrollBarThickness;
+}
+
 BOOL Renderer::HitTestCell(_In_ INT iX, _In_ INT iY, _Out_opt_ LPINT lpiCol, _Out_opt_ LPINT lpiRow) const noexcept
 {
     INT iContentX;

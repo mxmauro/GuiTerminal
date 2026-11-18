@@ -718,6 +718,16 @@ HRESULT GuiTerminalControl_GetCellSize(_In_ const GuiTerminalControl *lpControl,
     return ToCppControl(lpControl)->GetCellSize(lpSize);
 }
 
+INT GuiTerminalControl_GetScrollBarThickness(_In_ const GuiTerminalControl *lpControl)
+{
+    if (!lpControl)
+    {
+        return 0;
+    }
+
+    return ToCppControl(lpControl)->GetScrollBarThickness();
+}
+
 BOOL GuiTerminalControl_GetCellPosition(_In_ const GuiTerminalControl *lpControl, _In_ INT iCol, _In_ INT iRow, _Out_ LPRECT lprcCell)
 {
     if (!lprcCell)

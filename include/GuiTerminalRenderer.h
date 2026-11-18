@@ -65,6 +65,8 @@ class Renderer
     VOID UpdateScrollBars() noexcept;
     /** @brief Returns TRUE when either scrollbar is currently visible. */
     BOOL HasVisibleScrollBars() const noexcept;
+    /** @brief Returns the scrollbar thickness in client pixels. */
+    INT GetScrollBarThickness() const noexcept;
 
     /** @brief Converts a client-pixel position to a terminal cell. */
     BOOL HitTestCell(_In_ INT iX, _In_ INT iY, _Out_opt_ LPINT lpiCol, _Out_opt_ LPINT lpiRow) const noexcept;
